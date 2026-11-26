@@ -1,0 +1,7 @@
+# The sent folder, as the bounce-rate guard's denominator.
+id: mailbox-sent
+source: mailbox
+filter: { all: [{ field: kind, op: eq, value: sent }] }
+dedupe_key: "sent:{{event.message_id}}"
+action: { kind: append_list, list: sent, value: "{{event.to}}" }
+trust: high

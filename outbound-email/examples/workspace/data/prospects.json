@@ -1,0 +1,11 @@
+{
+  "search": [
+    { "saved_search": "agency-founders-us", "email": "dana@harborlane.test", "name": "Dana Whitfield", "title": "Founder", "company": "Harbor Lane Studio", "tz": "America/New_York" },
+    { "saved_search": "agency-founders-us", "email": "sam@harborlane.test", "name": "Sam Ortiz", "title": "Ops Lead", "company": "Harbor Lane Studio", "tz": "America/New_York" },
+    { "saved_search": "agency-founders-us", "email": "lee@brightfold.test", "name": "Lee Chen", "title": "Managing Partner", "company": "Brightfold", "tz": "America/Chicago" },
+    { "saved_search": "agency-founders-us", "email": "ana@tallgrass.test", "name": "Ana Silva", "title": "Founder", "company": "Tallgrass Creative", "tz": "America/Denver" },
+    { "saved_search": "agency-founders-us", "email": "jo@quietcoast.test", "name": "Jo Park", "title": "CEO", "company": "Quiet Coast", "tz": "America/Los_Angeles" },
+    { "saved_search": "agency-founders-us", "email": "max@ourclient.test", "name": "Max Bell", "title": "Founder", "company": "Our Client Co", "tz": "America/New_York" },
+    { "saved_search": "agency-founders-us", "email": "kim@redkite.test", "name": "Kim Novak", "title": "Founder", "company": "Red Kite", "tz": "America/New_York" }
+  ]
+}

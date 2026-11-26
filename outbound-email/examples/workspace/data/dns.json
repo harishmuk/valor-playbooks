@@ -1,0 +1,1 @@
+{ "auth": [ { "domain": "northwindledger-mail.test", "spf": "v=spf1 include:mail.example.test ~all", "dkim": true, "dmarc": "v=DMARC1; p=none; rua=mailto:dmarc@northwindledger-mail.test", "mx": ["mx1.example.test"] } ] }

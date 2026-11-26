@@ -1,0 +1,6 @@
+id: seeds
+kind: other
+connector: { type: fixture, data: data/seeds.json }
+description: "Seed inboxes the owner controls, for placement tests."
+queries:
+  placement: { params: [subject] }

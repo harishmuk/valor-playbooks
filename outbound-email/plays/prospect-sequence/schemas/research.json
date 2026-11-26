@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "required": ["id", "verdict"],
+  "properties": {
+    "id": { "type": "string" },
+    "verdict": { "enum": ["qualified", "disqualify"] },
+    "reason": { "type": "string" },
+    "role_confirmed": {
+      "type": "object",
+      "required": ["source_url", "source_date"],
+      "properties": { "source_url": { "type": "string" }, "source_date": { "type": "string" } }
+    },
+    "hook": {
+      "type": "object",
+      "required": ["fact", "source_url", "source_date", "quote"],
+      "properties": {
+        "fact": { "type": "string" },
+        "source_url": { "type": "string" },
+        "source_date": { "type": "string" },
+        "quote": { "type": "string" }
+      }
+    },
+    "pain_points": { "type": "array", "items": { "type": "string" }, "maxItems": 2 }
+  }
+}

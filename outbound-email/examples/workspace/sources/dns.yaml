@@ -1,0 +1,6 @@
+id: dns
+kind: other
+connector: { type: fixture, data: data/dns.json }
+description: "Public DNS lookups for mail authentication."
+queries:
+  auth: { params: [domain] }

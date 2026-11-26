@@ -1,0 +1,6 @@
+# Default deny. Work started by a reply (low trust) may read the campaign settings and check known contacts, nothing else.
+grants:
+  - { id: low-campaigns, principal: "initiator:trust:low", resource: "source:campaigns", role: query, granted_by: owner, reason: "handle-reply loads its campaign" }
+  - { id: low-contacts, principal: "initiator:trust:low", resource: "source:contacts#known", role: query, granted_by: owner, reason: "a referral's sequence checks for an existing relationship" }
+  - { id: researcher-prospects, principal: "agent:researcher", resource: "source:prospects", role: query, granted_by: owner }
+  - { id: analyst-prospects, principal: "agent:analyst", resource: "source:prospects", role: query, granted_by: owner }

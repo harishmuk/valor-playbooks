@@ -1,0 +1,1 @@
+{ "type": "object", "required": ["id", "body"], "properties": { "id": { "type": "string" }, "subject": { "type": "string" }, "body": { "type": "string" } } }

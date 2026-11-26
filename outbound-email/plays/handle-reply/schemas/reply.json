@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "required": ["id", "label", "quote"],
+  "properties": {
+    "id": { "type": "string" },
+    "label": { "enum": ["interested", "question", "meeting_time", "not_now", "referral", "opted_out", "out_of_office", "wrong_person", "other"] },
+    "quote": { "type": "string" },
+    "meeting_time": { "type": "string" },
+    "not_before": { "type": "string" },
+    "return_date": { "type": "string" },
+    "referral": { "type": "object", "properties": { "name": { "type": "string" }, "email": { "type": "string" }, "company": { "type": "string" } } }
+  }
+}

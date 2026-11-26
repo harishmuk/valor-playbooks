@@ -1,0 +1,5 @@
+# Outbound email: a horizontal playbook any business can run.
+# It holds plays, skills and guards only. A vertical (say, distribution) is a layer that `extends: ../outbound-email`,
+# and the customer's workspace is the last layer. See README.md for what a workspace must supply.
+name: outbound-email
+version: 1

@@ -1,0 +1,9 @@
+{
+  "verify": [
+    { "email": "dana@harborlane.test", "status": "valid" },
+    { "email": "lee@brightfold.test", "status": "valid" },
+    { "email": "ana@tallgrass.test", "status": "catch_all" },
+    { "email": "jo@quietcoast.test", "status": "valid" },
+    { "email": "kim@redkite.test", "status": "valid" }
+  ]
+}

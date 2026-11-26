@@ -1,0 +1,10 @@
+# Opt-outs are code, not judgment, and take effect before any agent reads the message.
+id: mailbox-optout
+source: mailbox
+filter:
+  all:
+    - { field: kind, op: eq, value: reply }
+    - { field: text, op: matches, value: "\\b(unsubscribe|remove me|take me off|opt[ -]?out|stop (emailing|contacting|writing)|do not (contact|email)|don'?t (contact|email))\\b|^\\s*(no|stop)[\\s.!]*$" }
+dedupe_key: "optout:{{event.message_id}}"
+action: { kind: append_list, list: suppression, value: "{{event.from}}" }
+trust: low

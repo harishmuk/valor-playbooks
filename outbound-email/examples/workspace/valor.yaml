@@ -1,0 +1,20 @@
+# Sample workspace for the outbound email playbook: invented business, fixture agents, recorded data. Never sends anything.
+name: outbound-sample
+owners:
+  owner:
+    email: owner@example.test
+auth:
+  methods: [local-cli]
+  local_cli_principal: owner
+playbooks: [../..]
+adapters:
+  events: { kind: memory }
+loop:
+  nudge_after: 30m
+  lease: 2h
+  reinvokes: 1
+  rework_rounds: 2
+  agents_before_escalate: 2
+  recheck_rate: 0
+  cold_start_runs: 0
+inbox: { daily_budget: 20 }

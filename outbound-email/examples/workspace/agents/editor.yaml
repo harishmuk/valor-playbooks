@@ -1,0 +1,6 @@
+id: editor
+name: editor
+task_types: [writing]
+reach: { kind: fixture }
+acts_as: []
+limits: { concurrency: 50, cost_per_run_usd: 0.1 }

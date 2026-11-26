@@ -1,0 +1,7 @@
+id: calendar
+kind: calendar
+connector: { type: fixture, data: data/calendar.json }
+description: "The owner's calendar, read-only."
+queries:
+  event: { params: [id] }
+  attended: { params: [attendee] }
