@@ -1,0 +1,6 @@
+id: prospects
+kind: other
+connector: { type: fixture, data: data/prospects.json }
+description: "Prospect database (in a real workspace: Apollo, a CRM view, a spreadsheet). Read-only."
+queries:
+  search: { params: [saved_search], cost_usd: 0.01 }

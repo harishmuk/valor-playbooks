@@ -1,0 +1,6 @@
+id: contacts
+kind: other
+connector: { type: fixture, data: data/contacts.json }
+description: "Existing relationships: customers, partners, people already in conversation. Read-only."
+queries:
+  known: { params: [email] }

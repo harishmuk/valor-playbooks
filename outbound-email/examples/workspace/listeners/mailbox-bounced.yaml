@@ -1,0 +1,6 @@
+id: mailbox-bounced
+source: mailbox
+filter: { all: [{ field: kind, op: eq, value: bounce }] }
+dedupe_key: "bounced:{{event.message_id}}"
+action: { kind: append_list, list: bounced, value: "{{event.recipient}}" }
+trust: low

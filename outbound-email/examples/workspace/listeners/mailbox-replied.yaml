@@ -1,0 +1,7 @@
+# Anyone who replies leaves the sequence: recheck steps and the stop-on-reply guard read this list.
+id: mailbox-replied
+source: mailbox
+filter: { all: [{ field: kind, op: eq, value: reply }] }
+dedupe_key: "replied:{{event.message_id}}"
+action: { kind: append_list, list: replied, value: "{{event.from}}" }
+trust: low

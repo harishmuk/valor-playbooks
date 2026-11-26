@@ -1,0 +1,6 @@
+id: researcher
+name: researcher
+task_types: [research, reply-triage]
+reach: { kind: fixture }
+acts_as: []
+limits: { concurrency: 50, cost_per_run_usd: 0.1 }

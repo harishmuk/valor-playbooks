@@ -1,0 +1,6 @@
+id: campaigns
+kind: settings
+connector: { type: json-file, data: data/campaigns.json }
+description: "Campaign settings: sender, offer and allowed claims, rules, audience, limits"
+queries:
+  get: { params: [id] }

@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "required": ["id", "companies"],
+  "properties": {
+    "id": { "type": "string" },
+    "companies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["company", "verdict", "reason"],
+        "properties": {
+          "company": { "type": "string" },
+          "verdict": { "type": "string" },
+          "reason": { "type": "string" },
+          "source_url": { "type": "string" },
+          "segment": { "type": "string" },
+          "fit": { "type": "number" },
+          "people": { "type": "array", "items": { "type": "object", "required": ["email"], "properties": { "email": { "type": "string" }, "name": { "type": "string" }, "title": { "type": "string" }, "why": { "type": "string" }, "tz": { "type": "string" } } } }
+        }
+      }
+    }
+  }
+}

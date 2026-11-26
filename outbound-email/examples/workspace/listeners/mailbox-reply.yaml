@@ -1,0 +1,12 @@
+# One Handle a reply run per inbound human reply, at low trust. One listener per sending mailbox names its campaign.
+id: mailbox-reply
+source: mailbox
+filter:
+  all:
+    - { field: kind, op: eq, value: reply }
+    - { field: to, op: eq, value: "alex@northwindledger-mail.test" }
+dedupe_key: "reply:{{event.message_id}}"
+action: { kind: start_play, play: handle-reply, goal: outreach, inputs: { campaign: spring-agencies, email: "{{event.from}}" } }
+response_time: { claim: 30m, done: 4h }
+limits: { per_hour: 30 }
+trust: low

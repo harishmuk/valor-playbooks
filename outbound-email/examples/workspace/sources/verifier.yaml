@@ -1,0 +1,6 @@
+id: verifier
+kind: other
+connector: { type: fixture, data: data/verifier.json }
+description: "Email verification service. Read-only."
+queries:
+  verify: { params: [email], cost_usd: 0.008 }

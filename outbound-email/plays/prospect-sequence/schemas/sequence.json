@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "required": ["id", "based_on_research", "emails"],
+  "properties": {
+    "id": { "type": "string" },
+    "based_on_research": { "type": "string" },
+    "emails": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["body"],
+        "properties": { "subject": { "type": "string" }, "body": { "type": "string" } }
+      }
+    }
+  }
+}
