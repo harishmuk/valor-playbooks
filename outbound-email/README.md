@@ -66,7 +66,7 @@ only who to reach and what to say.
 | footer: postal address, opt-out line | the offer: the ask, allowed claims, pain points |
 | a daily cap per mailbox, shared by every goal and play sending from it | writing rules: touches, word limits, banned phrases |
 | status: `active`, `warming`, `planned`, `paused` | which lanes to use (`senders: [ids]`, default: every active lane) |
-| setup: warmup days, budget, seed inboxes, minimum inbox share | research freshness, bounce limits, meeting length |
+| health: minimum health score and spam rate (mailbox-health), setup budget | research freshness, bounce limits, meeting length |
 
 `build-list` spreads a goal's list over its lanes. Each `prospect-sequence` carries its lane (`sender`) and that lane's
 cap, and pacing keys on the lane across the workspace, so two goals can never push one mailbox past its cap. A reply
@@ -218,5 +218,5 @@ to it: `valor eval handle-reply --agent <id>`. Eval tasks are prepare-only and c
 
 ## Tests
 
-`test/` runs every play end to end on the VALOR core with fixture agents and a fake sent folder, seed inboxes and
+`test/` runs every play end to end on the VALOR core with fixture agents and a fake sent folder, warmup provider and
 calendar. Nothing is sent. See the repository README for how to run them.
