@@ -17,6 +17,16 @@ export default function (ctx) {
     } else rest.push(p);
   }
   const reserves = rest.slice(0, Math.ceil(size * reserveShare));
+  // spread the list over the campaign's sending lanes, in rank order, so each mailbox gets an even share
+  const lanes = c.lanes ?? [];
+  if (!lanes.length) throw new Error("no active sending lane: add a mailbox to the senders source (status: active)");
+  const byLane = {};
+  prospects.forEach((p, i) => {
+    const l = lanes[i % lanes.length];
+    Object.assign(p, { sender: l.id, sender_daily_cap: Number(l.daily_cap ?? 25) });
+    byLane[l.id] = (byLane[l.id] ?? 0) + 1;
+  });
   const segs = Object.entries(bySeg).map(([k, v]) => `${k} ${v}`).join(", ");
-  return { prospects, reserves, by_segment: bySeg, summary: `${prospects.length} people (${segs || "none"}), ${reserves.length} reserves` };
+  const lanesText = Object.entries(byLane).map(([k, v]) => `${k} ${v}`).join(", ");
+  return { prospects, reserves, by_segment: bySeg, by_sender: byLane, summary: `${prospects.length} people (${segs || "none"}), ${reserves.length} reserves, sending from ${lanesText}` };
 }

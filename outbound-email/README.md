@@ -11,7 +11,7 @@ playbook, and the customer's workspace is the last layer on top.
 
 | Play | What it does | Started by |
 |---|---|---|
-| `ready-sender` | Proposes a separate sending domain and its costs (owner approves the spend), authenticates it, waits out warmup, then proves inbox placement from seed inboxes | the owner, once per sending domain |
+| `ready-sender` | Proposes a separate sending domain and its costs (owner approves the spend), authenticates it, waits out warmup, then proves inbox placement from seed inboxes | the owner, once per new sending lane (skip it for mailboxes that are already warm) |
 | `build-list` | Pulls candidates from the prospect source, removes anyone we must not email, has an agent qualify them, verifies addresses, picks the list with segment caps, gets the owner's approval, starts one sequence per person | the owner, once per campaign |
 | `prospect-sequence` | Researches one person, writes the sequence (peer reviewed), owner approves email 1 with the whole sequence, sends in paced slots, proves each send from the sent folder, re-checks before each follow-up | `build-list`, or a referral |
 | `handle-reply` | Triages a reply into a fixed label with a verbatim quote, then answers (owner approves), books, takes a referral or brings it to the owner | the reply listener, at low trust |
@@ -50,6 +50,24 @@ not legal advice.
 - **Bookings are read from the calendar**, DNS from public DNS, placement from the seed inboxes.
 - **Claims are code-checked.** Every figure in an email must appear in the campaign's allowed claims or its ask.
 
+## Two layers of settings: sending lanes and goals
+
+The email infrastructure is set up **once per workspace** and shared; each outbound motion is a **goal** that brings
+only who to reach and what to say.
+
+| Set once, in the workspace (`senders` source) | Per goal (`campaigns` source, one record per motion) |
+|---|---|
+| each mailbox as a sending lane: address, sender name and company, domain, main domain to protect | who to reach: audience, saved search, list size, segments, exclusions |
+| footer: postal address, opt-out line | the offer: the ask, allowed claims, pain points |
+| a daily cap per mailbox, shared by every goal and play sending from it | writing rules: touches, word limits, banned phrases |
+| status: `active`, `warming`, `planned`, `paused` | which lanes to use (`senders: [ids]`, default: every active lane) |
+| setup: warmup days, budget, seed inboxes, minimum inbox share | research freshness, bounce limits, meeting length |
+
+`build-list` spreads a goal's list over its lanes. Each `prospect-sequence` carries its lane (`sender`) and that lane's
+cap, and pacing keys on the lane across the workspace, so two goals can never push one mailbox past its cap. A reply
+joins the goal and lane of the sequence it answers (the reply listener `follows` that run), so one set of mailbox
+listeners serves every goal.
+
 ## What a workspace supplies
 
 The playbook declares what it needs; the workspace binds it. `examples/workspace` is a complete, runnable example
@@ -70,7 +88,8 @@ agents `research` and two `writing`, so peer review has a reviewer who is not th
 
 | Source | Queries | Rows |
 |---|---|---|
-| `campaigns` | `get(id)` | the campaign settings below |
+| `senders` | `get(id)` (no id: every lane) | the sending lanes below |
+| `campaigns` | `get(id)` | each goal's campaign settings below |
 | `prospects` | `search(saved_search)` | `email, name, title, company, tz` |
 | `contacts` | `known(email)` | existing relationships, to exclude |
 | `verifier` | `verify(email)` | `status`: `valid`, `catch_all`, `risky`, `invalid` |
@@ -87,17 +106,28 @@ agents `research` and two `writing`, so peer review has a reviewer who is not th
 `mailbox-sent` (→ `sent`, the bounce-rate denominator) and `mailbox-reply` (starts `handle-reply` at low trust).
 The mailbox adapter sets `kind` on each event: `reply`, `bounce`, `sent` or `auto_reply`.
 
-**Grants**: work started by a reply runs at low trust, so grant `initiator:trust:low` query access to `campaigns` and
-`contacts#known`, and nothing else.
+**Grants**: work started by a reply runs at low trust, so grant `initiator:trust:low` query access to `campaigns`,
+`senders` and `contacts#known`, and nothing else.
 
-**Campaign settings** (one record in `campaigns`; every check and guard reads this one copy):
+**Sending lanes** (one row per mailbox in `senders`):
+
+```yaml
+id: alex                     # the lane id goals and sequences refer to
+name, company, mailbox, domain, primary_domain, postal_address, opt_out_line
+daily_cap: 25                # per mailbox, across every goal
+status: active               # active | warming | planned | paused; only active lanes send
+warmup_days, setup_budget_usd, seed_inboxes, min_inbox_share   # for ready-sender
+```
+
+**Campaign settings** (one record per goal in `campaigns`; the `load` step joins it with the run's lane, so every check
+and guard reads one copy, with `campaign.sender` being that lane):
 
 ```yaml
 id: spring-agencies
 name: Spring outreach to agency founders
-sender:   { name, company, mailbox, primary_domain, postal_address, warmup_days, setup_budget_usd, seed_inboxes, min_inbox_share }
+senders:  [alex, sam]        # optional; default every active lane
 offer:    { ask, claims: [ ... ], pain_points: [ ... ] }
-rules:    { touches, first_max_words, followup_max_words, reply_max_words, max_questions, links_in_first, banned_phrases, opt_out_line, opt_out_pattern? }
+rules:    { touches, first_max_words, followup_max_words, reply_max_words, max_questions, links_in_first, banned_phrases, opt_out_pattern? }
 audience: { description, saved_search, per_company, list_size, reserve_share, max_segment_share, exclude_domains, keep_risky_addresses? }
 research: { hook_max_age_days }
 limits:   { max_bounce_rate, bounce_rate_min_sends }

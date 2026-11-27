@@ -4,7 +4,7 @@ version: 1
 title: Build the target list
 description: Pull candidates from the prospect source, remove anyone we must not email, have an agent qualify them against the audience, verify addresses, pick the list with segment caps, get the owner's approval, then start one Prospect sequence per person.
 inputs: { required: [campaign] }
-scope: { sources: [campaigns, prospects, contacts, verifier] }
+scope: { sources: [campaigns, senders, prospects, contacts, verifier] }
 steps:
   - id: load
     kind: code

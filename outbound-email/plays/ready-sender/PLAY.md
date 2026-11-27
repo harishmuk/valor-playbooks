@@ -3,8 +3,8 @@ id: ready-sender
 version: 1
 title: Ready the sending domain
 description: Set up a separate, authenticated sending domain and mailbox, warm it up, and prove inbox placement before any outreach, so the main domain's reputation is never at risk.
-inputs: { required: [campaign] }
-scope: { sources: [campaigns, dns, seeds] }
+inputs: { required: [sender] }
+scope: { sources: [campaigns, senders, dns, seeds] }
 steps:
   - id: load
     kind: code
@@ -12,7 +12,7 @@ steps:
 
   - id: buy
     kind: agent
-    title: "Propose and buy the sending domain for {{steps.load.output.campaign.name}}"
+    title: "Propose and buy the sending domain for {{steps.load.output.campaign.sender.name}}"
     task_type: sender-setup
     skills: [sending-setup]
     requires_acts_as: [domain-registrar]
@@ -44,7 +44,7 @@ steps:
 
   - id: connect
     kind: approval
-    ask: "Connect {{steps.buy.output.mailbox}} to VALOR as a read-only source (sent folder and inbox), and confirm the postal address in the campaign settings is the one to print in every footer."
+    ask: "Connect {{steps.buy.output.mailbox}} to VALOR as a read-only source (sent folder and inbox), and confirm the postal address on the lane in the senders source is the one to print in every footer."
 
   - { id: warmup-plan, kind: code, run: steps/warmup-plan.mjs }
   - { id: warmup, kind: wait, until: "{{steps.warmup-plan.output.until}}" }
@@ -56,9 +56,9 @@ steps:
     skills: [sending-setup]
     requires_acts_as: [outbound-mailbox]
     brief: |
-      Send one realistic sample email from {{steps.buy.output.mailbox}} to each address in the campaign's seed list, with a unique subject.
+      Send one realistic sample email from {{steps.buy.output.mailbox}} to each address in the lane's seed list, with a unique subject.
       Return a pointer {"id": "<the subject>", "subject": "<the subject>"}. VALOR reads the seed inboxes itself.
-    done_when: "At least the campaign's minimum share of seed inboxes received the sample in the inbox, not spam."
+    done_when: "At least the lane's minimum share of seed inboxes received the sample in the inbox, not spam."
     checks:
       - { id: seeds-read, kind: read_back }
       - { id: placement, kind: code, run: checks/placement.mjs }
@@ -73,4 +73,4 @@ Spending is draft, approve, then go: the agent proposes the domain and costs, th
 its own registrar account and shows a receipt. DNS and inbox placement are checked by VALOR from public DNS and the seed
 inboxes, not taken from the agent. A failing check goes back to the agent as rework with the failing record named.
 
-Warmup length is `sender.warmup_days` in the campaign (14 by default); the agent runs warmup with its own tools.
+Warmup length is the lane's `warmup_days` in the senders source (14 by default); the agent runs warmup with its own tools.

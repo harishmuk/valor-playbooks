@@ -3,8 +3,8 @@ id: prospect-sequence
 version: 1
 title: Prospect sequence
 description: Research one person, write a short sequence, get it approved once, send it on a paced schedule, prove every send from the sent folder, and stop as soon as they reply, bounce or opt out.
-inputs: { required: [campaign, email] }
-scope: { sources: [campaigns, contacts, mailbox] }
+inputs: { required: [campaign, email, sender] }
+scope: { sources: [campaigns, senders, contacts, mailbox] }
 steps:
   - id: load
     kind: code
@@ -113,8 +113,10 @@ standing_approvals:
   - { id: approved-sequence-3, step: send-3, description: "Send follow-up 3 when it matches, word for word, a sequence the owner already approved at email 1" }
 
 pacing:
-  key: "{{inputs.campaign}}"
-  daily_cap: 25
+  # one cap per mailbox, shared by every goal and play sending from it; the lane's daily_cap comes in with the prospect
+  key: "sender:{{inputs.sender}}"
+  scope: workspace
+  daily_cap: "{{inputs.sender_daily_cap}}"
   windows: [{ days: [1, 2, 3, 4, 5], from: "08:00", to: "11:00" }]
   tz: "{{inputs.tz}}"
 

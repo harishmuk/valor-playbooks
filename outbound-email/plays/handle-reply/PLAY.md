@@ -4,7 +4,7 @@ version: 1
 title: Handle a reply
 description: Started by the sending mailbox's reply listener, once per inbound message. Triage it into a fixed label, then answer, book, take a referral or bring it to the owner. Nothing goes back to the sender without the owner's approval.
 inputs: { required: [campaign, event] }
-scope: { sources: [campaigns, contacts, mailbox] }
+scope: { sources: [campaigns, senders, contacts, mailbox] }
 steps:
   - id: load
     kind: code
@@ -70,7 +70,7 @@ steps:
     after: [triage]
     when: { all: [{ field: steps.triage.output.label, op: eq, value: meeting_time }] }
     play: book-meeting
-    inputs: { campaign: "{{inputs.campaign}}", email: "{{inputs.event.from}}", meeting_time: "{{steps.triage.output.meeting_time}}", thread: "{{inputs.event.thread_id}}" }
+    inputs: { campaign: "{{inputs.campaign}}", sender: "{{inputs.sender}}", email: "{{inputs.event.from}}", meeting_time: "{{steps.triage.output.meeting_time}}", thread: "{{inputs.event.thread_id}}" }
     wait: all
 
   - id: referral-ok
@@ -84,7 +84,7 @@ steps:
     kind: children
     after: [referral-ok]
     play: prospect-sequence
-    inputs: { campaign: "{{inputs.campaign}}", email: "{{steps.triage.output.referral.email}}", name: "{{steps.triage.output.referral.name}}", company: "{{steps.triage.output.referral.company}}", referred_by: "{{inputs.event.from}}" }
+    inputs: { campaign: "{{inputs.campaign}}", sender: "{{inputs.sender}}", sender_daily_cap: "{{inputs.sender_daily_cap}}", email: "{{steps.triage.output.referral.email}}", name: "{{steps.triage.output.referral.name}}", company: "{{steps.triage.output.referral.company}}", referred_by: "{{inputs.event.from}}" }
     wait: none
 
   - id: owner-look

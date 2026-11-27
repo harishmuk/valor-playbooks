@@ -3,17 +3,6 @@
     {
       "id": "spring-agencies",
       "name": "Spring outreach to agency founders",
-      "sender": {
-        "name": "Alex Rivera",
-        "company": "Northwind Ledger",
-        "mailbox": "alex@northwindledger-mail.test",
-        "primary_domain": "northwindledger.test",
-        "postal_address": "Northwind Ledger, 100 Example Street, Springfield, IL 62701",
-        "warmup_days": 14,
-        "setup_budget_usd": 80,
-        "seed_inboxes": ["seed1@example.test", "seed2@example.test", "seed3@example.test", "seed4@example.test", "seed5@example.test"],
-        "min_inbox_share": 0.8
-      },
       "offer": {
         "ask": "a 20-minute call next month",
         "claims": [
@@ -21,7 +10,12 @@
           "Clients cut month-end time by 40% on average in their first quarter.",
           "One flat monthly fee, starting at $900."
         ],
-        "pain_points": ["late-close", "cash-visibility", "contractor-payments", "project-margins"]
+        "pain_points": [
+          "late-close",
+          "cash-visibility",
+          "contractor-payments",
+          "project-margins"
+        ]
       },
       "rules": {
         "touches": 3,
@@ -30,8 +24,14 @@
         "reply_max_words": 120,
         "max_questions": 1,
         "links_in_first": false,
-        "banned_phrases": ["transform", "revolutionize", "leverage", "quick question", "circle back", "AI-powered"],
-        "opt_out_line": "Not relevant? Reply \"no\" and I won't write again."
+        "banned_phrases": [
+          "transform",
+          "revolutionize",
+          "leverage",
+          "quick question",
+          "circle back",
+          "AI-powered"
+        ]
       },
       "audience": {
         "description": "Independent creative and marketing agencies in the US with 10 to 200 staff, run by a founder or managing partner.",
@@ -40,11 +40,23 @@
         "list_size": 4,
         "reserve_share": 0.25,
         "max_segment_share": 0.5,
-        "exclude_domains": ["northwindledger.test"]
+        "exclude_domains": [
+          "northwindledger.test"
+        ]
       },
-      "research": { "hook_max_age_days": 365 },
-      "limits": { "max_bounce_rate": 0.03, "bounce_rate_min_sends": 20 },
-      "meeting": { "minutes": 30 }
+      "research": {
+        "hook_max_age_days": 365
+      },
+      "limits": {
+        "max_bounce_rate": 0.03,
+        "bounce_rate_min_sends": 20
+      },
+      "meeting": {
+        "minutes": 30
+      },
+      "senders": [
+        "alex"
+      ]
     }
   ]
 }

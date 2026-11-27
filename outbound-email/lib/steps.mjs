@@ -1,12 +1,44 @@
 // Code steps shared by the plays. Each play's steps/ file re-exports one of these, so a layer can swap a single file.
 import { lower, onList } from "./email.mjs";
 
-/** Loads the campaign's settings from the `campaigns` source. Every play starts with this, so checks and guards see one copy. */
+/**
+ * Sending lanes: the workspace's mailboxes, set up once and shared by every goal. One row per mailbox in the `senders`
+ * source: id, name, company, mailbox, domain, primary_domain, postal_address, opt_out_line, daily_cap, status
+ * (active | warming | planned | paused), and for setup: warmup_days, setup_budget_usd, seed_inboxes, min_inbox_share.
+ */
+export async function loadLanes(ctx) {
+  return ctx.query("senders", "get", {});
+}
+
+/** Lanes a campaign may send from: active ones, limited to the campaign's `senders` list when it has one. */
+export function sendingLanes(lanes, campaign) {
+  const allow = campaign?.senders;
+  return lanes.filter((l) => (l.status ?? "active") === "active" && (!allow?.length || allow.includes(l.id) || allow.includes(l.mailbox)));
+}
+
+/**
+ * Loads one goal's campaign (who, offer, claims, rules) from the `campaigns` source and joins it with the sending lane
+ * for this run (inputs.sender, or the mailbox a reply came to). Every play starts with this, so checks and guards see
+ * one copy, as `campaign` with `campaign.sender` being this run's lane and `campaign.lanes` every lane it may use.
+ */
 export async function loadCampaign(ctx) {
   const id = ctx.inputs.campaign;
-  const rows = await ctx.query("campaigns", "get", { id });
-  if (!rows.length) throw new Error(`campaign "${id}" not found in the campaigns source`);
-  return rows[0];
+  let campaign = { id: id ?? null };
+  if (id) {
+    const rows = await ctx.query("campaigns", "get", { id });
+    if (!rows.length) throw new Error(`campaign "${id}" not found in the campaigns source`);
+    campaign = rows[0];
+  }
+  const all = await loadLanes(ctx);
+  const want = lower(ctx.inputs.sender ?? ctx.inputs.event?.to ?? "");
+  const sender = (want && all.find((l) => lower(l.id) === want || lower(l.mailbox) === want)) ?? sendingLanes(all, campaign)[0];
+  if (ctx.inputs.sender && !sender) throw new Error(`sending lane "${ctx.inputs.sender}" not found in the senders source`);
+  return {
+    ...campaign,
+    lanes: sendingLanes(all, campaign),
+    sender: sender ?? {},
+    rules: { ...(campaign.rules ?? {}), opt_out_line: sender?.opt_out_line ?? campaign.rules?.opt_out_line },
+  };
 }
 
 /** Why VALOR must not write to this person, or null. Code only: lists in the ledger and the workspace's contacts source. */
