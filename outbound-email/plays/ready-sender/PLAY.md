@@ -1,10 +1,10 @@
 ---
 id: ready-sender
 version: 1
-title: Ready the sending domain
-description: Set up a separate, authenticated sending domain and mailbox, warm it up, and prove inbox placement before any outreach, so the main domain's reputation is never at risk.
+title: Set up a new sending mailbox
+description: Buy and authenticate a separate sending domain and mailbox (owner approves the spend), then connect it to VALOR and the warmup provider. From there mailbox-health holds it until it is warm, so the main domain's reputation is never at risk.
 inputs: { required: [sender] }
-scope: { sources: [campaigns, senders, dns, seeds] }
+scope: { sources: [campaigns, senders, dns] }
 steps:
   - id: load
     kind: code
@@ -44,33 +44,16 @@ steps:
 
   - id: connect
     kind: approval
-    ask: "Connect {{steps.buy.output.mailbox}} to VALOR as a read-only source (sent folder and inbox), and confirm the postal address on the lane in the senders source is the one to print in every footer."
-
-  - { id: warmup-plan, kind: code, run: steps/warmup-plan.mjs }
-  - { id: warmup, kind: wait, until: "{{steps.warmup-plan.output.until}}" }
-
-  - id: seed-test
-    kind: agent
-    title: "Seed test {{steps.buy.output.mailbox}}"
-    task_type: sender-setup
-    skills: [sending-setup]
-    requires_acts_as: [outbound-mailbox]
-    brief: |
-      Send one realistic sample email from {{steps.buy.output.mailbox}} to each address in the lane's seed list, with a unique subject.
-      Return a pointer {"id": "<the subject>", "subject": "<the subject>"}. VALOR reads the seed inboxes itself.
-    done_when: "At least the lane's minimum share of seed inboxes received the sample in the inbox, not spam."
-    checks:
-      - { id: seeds-read, kind: read_back }
-      - { id: placement, kind: code, run: checks/placement.mjs }
-    output: { kind: pointer, system: seeds, read_back: { source: seeds, query: placement, params: { subject: "{{pointer.subject}}" } } }
+    ask: "Connect {{steps.buy.output.mailbox}}: run `valor mailbox add {{steps.buy.output.mailbox}} --provider <provider> --lane {{inputs.sender}}`, add it to the warmup provider, confirm the lane's postal address, and set the lane active. mailbox-health holds it until it is warm."
 ---
-# Ready the sending domain
+# Set up a new sending mailbox
 
 Cold email from a new domain lands in spam unless the domain is authenticated and warmed, and a bad run can damage the
 domain it comes from. This play keeps outreach off the main domain and proves the new one works before anything is sent.
 
 Spending is draft, approve, then go: the agent proposes the domain and costs, the owner approves, then the agent buys with
-its own registrar account and shows a receipt. DNS and inbox placement are checked by VALOR from public DNS and the seed
-inboxes, not taken from the agent. A failing check goes back to the agent as rework with the failing record named.
+its own registrar account and shows a receipt. DNS is checked by VALOR from public DNS, not taken from the agent.
 
-Warmup length is the lane's `warmup_days` in the senders source (14 by default); the agent runs warmup with its own tools.
+Warmup is not a wait inside this play: the warmup provider warms the mailbox, and `mailbox-health` keeps the lane held
+until its health score clears the threshold, then releases it. A mailbox that is already warm skips this play: connect
+it with `valor mailbox add` and `mailbox-health` clears it on its next run.

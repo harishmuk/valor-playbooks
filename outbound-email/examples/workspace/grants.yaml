@@ -5,3 +5,5 @@ grants:
   - { id: low-contacts, principal: "initiator:trust:low", resource: "source:contacts#known", role: query, granted_by: owner, reason: "a referral's sequence checks for an existing relationship" }
   - { id: researcher-prospects, principal: "agent:researcher", resource: "source:prospects", role: query, granted_by: owner }
   - { id: analyst-prospects, principal: "agent:analyst", resource: "source:prospects", role: query, granted_by: owner }
+  - { id: health-warmup, principal: "play:mailbox-health", resource: "resource:warmup#start_warmup", role: act, granted_by: owner, reason: "a held mailbox gets warmed up" }
+  - { id: daily-deliverability, principal: "initiator:trust:high", resource: "source:deliverability", role: query, granted_by: owner, reason: "the daily mailbox-health check reads each mailbox's health" }

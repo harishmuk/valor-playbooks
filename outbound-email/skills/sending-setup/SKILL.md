@@ -1,6 +1,6 @@
 ---
 name: sending-setup
-description: Set up, authenticate, warm up and test a separate domain and mailbox for outbound email, so outreach never touches the main domain's reputation.
+description: Propose, buy and authenticate a separate domain and mailbox for outbound email, so outreach never touches the main domain's reputation. Warmup is the warmup provider's job.
 ---
 # Sending setup
 
@@ -17,8 +17,5 @@ description: Set up, authenticate, warm up and test a separate domain and mailbo
 - MX for the provider, so replies and bounces arrive.
 
 ## Warm up
-- Ramp from about 5 to 40 emails a day over 14 days with your warmup tool. No campaign email during warmup.
-
-## Seed test
-- One realistic email (plain text, the real footer) to every seed inbox, with a subject used nowhere else.
-- Report the subject as the pointer. Do not report placement yourself: it is read from the seed inboxes.
+- Not yours: the owner connects the mailbox to the workspace's warmup provider, and VALOR's mailbox-health play holds
+  the mailbox until its health score clears the threshold.

@@ -2,5 +2,5 @@ id: backup-sender
 name: backup-sender
 task_types: [send-email]
 reach: { kind: fixture }
-acts_as: [outbound-mailbox]
+acts_as: []
 limits: { concurrency: 50, cost_per_run_usd: 0.2 }

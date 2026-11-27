@@ -41,9 +41,9 @@ describe("outbound email playbook", () => {
   it("loads on the core with no validation issues", () => {
     const { ws, issues } = loadWorkspace(sampleWorkspace());
     expect(issues).toEqual([]);
-    expect([...ws.plays.keys()].sort()).toEqual(["book-meeting", "build-list", "check-lanes", "handle-reply", "prospect-sequence", "ready-sender"]);
+    expect([...ws.plays.keys()].sort()).toEqual(["book-meeting", "build-list", "check-lanes", "handle-reply", "mailbox-health", "prospect-sequence", "ready-sender"]);
     expect(ws.skills.size).toBe(9);
-    expect([...ws.guards.keys()].sort()).toEqual(["bounce-rate", "claims-only", "sender-compliance", "stop-on-reply", "suppression"]);
+    expect([...ws.guards.keys()].sort()).toEqual(["bounce-rate", "claims-only", "sender-compliance", "sender-health", "stop-on-reply", "suppression"]);
   });
 
   it("prospect sequence: approve email 1 once, follow-ups go under standing approvals, every send proven from the sent folder", async () => {
@@ -245,7 +245,7 @@ describe("outbound email playbook", () => {
     expect(batch.count).toBe(4);
   });
 
-  it("ready the sender: spend is approved before it happens, DNS and inbox placement are read by VALOR", async () => {
+  it("set up a new mailbox: spend is approved before it happens, DNS is read by VALOR, then the owner connects it", async () => {
     const t = await withCast();
     const pr = await startPlayRun(t.eng, { play: "ready-sender", goal: "outreach", inputs: { sender: "alex" } });
     await t.settle();
@@ -256,10 +256,10 @@ describe("outbound email playbook", () => {
     let s = await t.eng.state();
     expect(stepStatus(s, pr)).toMatchObject({ buy: "done", authenticate: "done", connect: "waiting" });
     expect(s.events.some((e) => e.kind === "source.queried" && e.data.source === "dns")).toBe(true);
-    await t.correct((await t.open()).find((e) => e.kind === "approval")!.id, "approve");
-    await t.run(15 * DAY, 12 * HOUR);
+    const connect = (await t.open()).find((e) => e.kind === "approval")!;
+    expect(connect.ask).toContain("valor mailbox add");
+    await t.correct(connect.id, "approve");
     s = await t.eng.state();
-    expect(stepStatus(s, pr)).toMatchObject({ warmup: "done", "seed-test": "done" });
     expect(s.playRuns.get(pr)!.status).toBe("done");
   });
 
@@ -315,7 +315,7 @@ describe("outbound email playbook", () => {
     // a list in an override replaces the one below, but the base guards attach themselves with applies_to,
     // so a layer cannot drop suppression or stop-on-reply by accident
     expect(play.front.guards).toEqual(["business-hours-only"]);
-    expect(applicableGuards(ws, "prospect-sequence", [], play.front.guards).map((g) => g.id).sort()).toEqual(["bounce-rate", "business-hours-only", "claims-only", "sender-compliance", "stop-on-reply", "suppression"]);
+    expect(applicableGuards(ws, "prospect-sequence", [], play.front.guards).map((g) => g.id).sort()).toEqual(["bounce-rate", "business-hours-only", "claims-only", "sender-compliance", "sender-health", "stop-on-reply", "suppression"]);
     expect(ws.layers.map((l) => l.name)).toEqual(["outbound-email", "vertical-example", "workspace"]);
   });
 });
@@ -345,6 +345,56 @@ describe("sending lanes are workspace resources; each goal brings only its campa
     // sam's sequences write from sam, with sam's footer identity
     const samRun = kids.find((k) => k.inputs.sender === "sam")!;
     expect((samRun.steps.load.output as any).campaign.sender.mailbox).toBe("sam@northwindledger-mail.test");
+  });
+
+  it("mailbox health: a mailbox under its threshold is held and warmed, gets no prospects, and its approved sends wait until it is cleared", async () => {
+    const root = sampleWorkspace();
+    const f = join(root, "data", "senders.json");
+    const d = JSON.parse(readFileSync(f, "utf8"));
+    d.get.push({ ...d.get[0], id: "sam", name: "Sam Rivera", mailbox: "sam@northwindledger-mail.test" });
+    writeFileSync(f, JSON.stringify(d));
+    const hf = join(root, "data", "deliverability.json");
+    const health = (samScore: number, warmup = "inactive") =>
+      writeFileSync(hf, JSON.stringify({ health: [{ mailbox: "alex@northwindledger-mail.test", score: 97, warmup: "active", spam_rate: 0.01, blocked: false }, { mailbox: "sam@northwindledger-mail.test", score: samScore, warmup, spam_rate: 0.01, blocked: false }] }));
+    health(62);
+    const cf = join(root, "data", "campaigns.json");
+    const c = JSON.parse(readFileSync(cf, "utf8"));
+    delete c.get[0].senders;
+    writeFileSync(cf, JSON.stringify(c));
+    const t = await withCast({}, { root });
+    // the standing goal: a clock row starts the daily check
+    const r = await t.eng.ingestEvent("clock", { key: "daily:2026-12-01T00:00:00.000Z" });
+    expect(r.find((x) => x.listener === "daily-mailbox-health")!.outcome).toBe("started");
+    await t.settle();
+    let s = await t.eng.state();
+    const run = [...s.playRuns.values()].find((p) => p.play_id === "mailbox-health")!;
+    expect((run.steps.judge.output as any).summary).toBe("1 cleared to send (alex 97); 1 held: sam (health 62 is under 90)");
+    expect([...s.lists.get("held-senders")!]).toEqual(["sam"]);
+    // rehearsal is off in the sample: VALOR started sam's warmup through the warmup resource, under the play's grant
+    expect(JSON.parse(readFileSync(join(root, "data", "warmup.json"), "utf8")).started.map((x: any) => x.mailbox)).toEqual(["sam@northwindledger-mail.test"]);
+    // new lists go only to cleared mailboxes
+    const pr = await startPlayRun(t.eng, { play: "build-list", goal: "outreach", inputs: { campaign: "spring-agencies" } });
+    await t.settle();
+    s = await t.eng.state();
+    expect((s.playRuns.get(pr)!.steps.select.output as any).by_sender).toEqual({ alex: 4 });
+    // a sequence already on sam waits after approval: held, not blocked, and no alert
+    await t.standing("prospect-sequence", "send-1", "test-send-1");
+    const seq = await startPlayRun(t.eng, { play: "prospect-sequence", goal: "outreach", inputs: { ...DANA, email: "zoe@harborlane.test", sender: "sam", sender_daily_cap: 25 } });
+    await t.settle();
+    await t.approveAll((e: any) => e.ask?.includes("zoe@"));
+    await t.run(2 * HOUR);
+    s = await t.eng.state();
+    expect(s.events.filter((e) => e.kind === "goahead.waiting")).toHaveLength(1);
+    expect(t.world.sent("zoe@harborlane.test")).toHaveLength(0);
+    expect((await t.open()).some((e) => e.kind === "alert" && e.ask.includes("sender-health"))).toBe(false);
+    // the next day sam is warm: cleared, and the waiting email goes
+    health(93, "active");
+    await t.eng.ingestEvent("clock", { key: "daily:2026-12-02T00:00:00.000Z" });
+    await t.run(DAY, 2 * HOUR);
+    s = await t.eng.state();
+    expect([...s.lists.get("held-senders")!]).toEqual([]);
+    expect(t.world.sent("zoe@harborlane.test")).toHaveLength(1);
+    expect(s.playRuns.get(seq)!.steps["send-1"].status).toBe("done");
   });
 
   it("lanes are checked in public DNS first: a lane without DKIM, or one sending from the main domain, is left out", async () => {

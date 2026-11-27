@@ -119,7 +119,7 @@ pacing:
   windows: [{ days: [1, 2, 3, 4, 5], from: "08:00", to: "11:00" }]
   tz: "{{inputs.tz}}"
 
-guards: [suppression, stop-on-reply, bounce-rate, claims-only, sender-compliance]
+guards: [suppression, stop-on-reply, bounce-rate, claims-only, sender-compliance, sender-health]
 
 outcome: { kind: replied, source: mailbox, query: replies, params: { from: "{{inputs.email}}" }, window: 21d, every: 1d }
 ---

@@ -213,11 +213,6 @@ export function sender(world: World, eng: () => Engine, over: { tamper?: (body: 
           return { deliverable: { id: "plan-1", domain: "northwindledger-mail.test", mailbox: c.sender.mailbox, costs: [{ item: "domain", usd: 12, period: "year" }, { item: "mailbox", usd: 14, period: "month" }, { item: "warmup", usd: 29, period: "month" }] } };
         case "authenticate":
           return { pointer: { system: "dns", id: steps(ev).buy.output.domain }, evidence: [{ kind: "dns", value: "records published" }] };
-        case "seed-test": {
-          const subject = `seed ${t.id}`;
-          for (const [i, s] of c.sender.seed_inboxes.entries()) world.add("seeds", "placement", { subject, seed: s, folder: i === 0 ? "spam" : "inbox" });
-          return { pointer: { system: "seeds", id: subject, subject } as any, evidence: [{ kind: "message_id", value: `<${subject}@example.test>` }] };
-        }
         case "book":
           return { deliverable: { start: inp.meeting_time, minutes: 30, attendees: [inp.email], video: "https://meet.example.test/abc" } };
       }

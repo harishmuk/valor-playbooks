@@ -1,0 +1,10 @@
+# The warmup provider's account, in VALOR's vault. mailbox-health asks VALOR to start warmup for a held mailbox.
+# Live (Smartlead): actuator { type: smartlead }, credentials: secret://smartlead-api-key
+id: warmup
+kind: warmup
+actuator: { type: fixture, data: data/warmup.json, record_as: { start_warmup: started } }
+actions:
+  start_warmup:
+    description: "Turn on warmup for a mailbox the provider already has. Never turns warmup off."
+    params: [mailbox]
+    requires: grant

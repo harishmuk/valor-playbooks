@@ -95,7 +95,7 @@ steps:
     when: { all: [{ field: steps.triage.output.label, op: in, value: [other, wrong_person] }] }
     ask: "A reply needs you ({{steps.triage.output.label}}): {{inputs.event.from}} wrote \"{{steps.triage.output.quote}}\". Approve to archive it, or note what to do."
 
-guards: [suppression, claims-only]
+guards: [suppression, claims-only, sender-health]
 ---
 # Handle a reply
 

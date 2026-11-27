@@ -4,16 +4,16 @@ import { lower, onList } from "./email.mjs";
 /**
  * Sending lanes: the workspace's mailboxes, set up once and shared by every goal. One row per mailbox in the `senders`
  * source: id, name, company, mailbox, domain, primary_domain, postal_address, opt_out_line, daily_cap, status
- * (active | warming | planned | paused), resource (the vault resource VALOR sends from), and for setup: warmup_days, setup_budget_usd, seed_inboxes, min_inbox_share.
+ * (active | warming | planned | paused), resource (the vault resource VALOR sends from), min_health_score and max_spam_rate (mailbox-health), and setup_budget_usd.
  */
 export async function loadLanes(ctx) {
   return ctx.query("senders", "get", {});
 }
 
-/** Lanes a campaign may send from: active ones, limited to the campaign's `senders` list when it has one. */
-export function sendingLanes(lanes, campaign) {
+/** Lanes a campaign may send from: active ones not held by mailbox-health, limited to the campaign's `senders` list when it has one. */
+export function sendingLanes(lanes, campaign, held = new Set()) {
   const allow = campaign?.senders;
-  return lanes.filter((l) => (l.status ?? "active") === "active" && (!allow?.length || allow.includes(l.id) || allow.includes(l.mailbox)));
+  return lanes.filter((l) => (l.status ?? "active") === "active" && !held.has(lower(l.id)) && (!allow?.length || allow.includes(l.id) || allow.includes(l.mailbox)));
 }
 
 /**
@@ -31,11 +31,12 @@ export async function loadCampaign(ctx) {
   }
   const all = await loadLanes(ctx);
   const want = lower(ctx.inputs.sender ?? ctx.inputs.event?.to ?? "");
-  const sender = (want && all.find((l) => lower(l.id) === want || lower(l.mailbox) === want)) ?? sendingLanes(all, campaign)[0];
+  const held = ctx.list ? ctx.list("held-senders") : new Set();
+  const sender = (want && all.find((l) => lower(l.id) === want || lower(l.mailbox) === want)) ?? sendingLanes(all, campaign, held)[0];
   if (ctx.inputs.sender && !sender) throw new Error(`sending lane "${ctx.inputs.sender}" not found in the senders source`);
   return {
     ...campaign,
-    lanes: sendingLanes(all, campaign),
+    lanes: sendingLanes(all, campaign, held),
     sender: sender ?? {},
     rules: { ...(campaign.rules ?? {}), opt_out_line: sender?.opt_out_line ?? campaign.rules?.opt_out_line },
   };
@@ -94,4 +95,47 @@ export async function laneHealth(ctx, lanes) {
   }
   const summary = `${healthy.length} of ${lanes.length} lanes ready${failed.length ? `; not ready: ${failed.map((f) => `${f.id} (${f.reasons.join("; ")})`).join(", ")}` : ""}`;
   return { healthy, failed, warnings, summary };
+}
+
+/**
+ * Mailbox health, judged by code from the workspace's deliverability source (Smartlead, or any provider returning
+ * { mailbox, score (0-100), warmup: active|inactive|paused, spam_rate, blocked, blocked_reason, connected }):
+ * - cleared to send: score at or above the lane's min_health_score (default 90), spam rate at or under
+ *   max_spam_rate (default 0.03), not blocked, connected;
+ * - otherwise held: the lane goes on the `held-senders` list (nothing new is assigned to it and its queued sends
+ *   wait), and VALOR starts its warmup if it is not warming already.
+ * A lane the provider does not know is held too: it cannot be warmed or measured.
+ */
+export async function mailboxHealth(ctx) {
+  const lanes = (await loadLanes(ctx)).filter((l) => ["active", "warming"].includes(l.status ?? "active"));
+  const day = new Date(ctx.now).toISOString().slice(0, 10);
+  const cleared = [];
+  const held = [];
+  const acts = [];
+  for (const l of lanes) {
+    const mailbox = lower(l.mailbox);
+    const row = (await ctx.query("deliverability", "health", { mailbox }))[0];
+    const min = Number(l.min_health_score ?? 90);
+    const maxSpam = Number(l.max_spam_rate ?? 0.03);
+    const reasons = [];
+    if (!row) reasons.push("not connected in the warmup provider");
+    else {
+      if (row.connected === false) reasons.push("the warmup provider cannot log in to it");
+      if (row.blocked) reasons.push(`warmup blocked${row.blocked_reason ? `: ${row.blocked_reason}` : ""}`);
+      if (row.score == null) reasons.push("no health score yet");
+      else if (Number(row.score) < min) reasons.push(`health ${row.score} is under ${min}`);
+      if (row.spam_rate != null && Number(row.spam_rate) > maxSpam) reasons.push(`spam rate ${(Number(row.spam_rate) * 100).toFixed(1)}% is over ${(maxSpam * 100).toFixed(1)}%`);
+    }
+    if (reasons.length) {
+      held.push({ id: l.id, mailbox, score: row?.score ?? null, reasons });
+      if (row && row.warmup !== "active" && !row.blocked) acts.push({ resource: l.warmup_resource ?? "warmup", action: "start_warmup", params: { mailbox }, key: `warmup:${mailbox}:${day}` });
+    } else cleared.push({ id: l.id, mailbox, score: row.score });
+  }
+  return {
+    cleared,
+    held,
+    lists: { "held-senders": { add: held.map((h) => h.id), remove: cleared.map((c) => c.id) } },
+    acts,
+    summary: `${cleared.length} cleared to send${cleared.length ? ` (${cleared.map((c) => `${c.id} ${c.score}`).join(", ")})` : ""}; ${held.length} held${held.length ? `: ${held.map((h) => `${h.id} (${h.reasons.join("; ")})`).join(", ")}` : ""}`,
+  };
 }

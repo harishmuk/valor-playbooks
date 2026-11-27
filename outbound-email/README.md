@@ -11,7 +11,9 @@ playbook, and the customer's workspace is the last layer on top.
 
 | Play | What it does | Started by |
 |---|---|---|
-| `ready-sender` | Proposes a separate sending domain and its costs (owner approves the spend), authenticates it, waits out warmup, then proves inbox placement from seed inboxes | the owner, once per new sending lane (skip it for mailboxes that are already warm) |
+| `mailbox-health` | Reads every mailbox's health from the warmup provider (Smartlead or any other). At or above the lane's threshold: cleared to send. Under it: held (no new prospects, queued sends wait) and VALOR starts its warmup. Code only | a daily clock listener (a standing goal) |
+| `check-lanes` | Reads each sending domain's SPF, DKIM, DMARC and MX from public DNS, and that no lane sends from the main domain | the owner, any time; also the first step of `build-list` |
+| `ready-sender` | Proposes a separate sending domain and its costs (owner approves the spend), authenticates it, then has the owner connect it to VALOR and the warmup provider. `mailbox-health` holds it until warm | the owner, once per new mailbox (skip it for mailboxes that already exist) |
 | `build-list` | Pulls candidates from the prospect source, removes anyone we must not email, has an agent qualify them, verifies addresses, picks the list with segment caps, gets the owner's approval, starts one sequence per person | the owner, once per campaign |
 | `prospect-sequence` | Researches one person, writes the sequence (peer reviewed), owner approves email 1 with the whole sequence, sends in paced slots, proves each send from the sent folder, re-checks before each follow-up | `build-list`, or a referral |
 | `handle-reply` | Triages a reply into a fixed label with a verbatim quote, then answers (owner approves), books, takes a referral or brings it to the owner | the reply listener, at low trust |
@@ -50,7 +52,7 @@ not legal advice.
   or a changed text fails the task.
 - **Follow-ups are the approved text, word for word.** `matches-sequence` compares each send with the sequence the
   owner approved at email 1. That is what makes the standing approvals for follow-ups safe.
-- **Bookings are read from the calendar**, DNS from public DNS, placement from the seed inboxes.
+- **Bookings are read from the calendar**, DNS from public DNS, mailbox health from the warmup provider.
 - **Claims are code-checked.** Every figure in an email must appear in the campaign's allowed claims or its ask.
 
 ## Two layers of settings: sending lanes and goals
@@ -106,7 +108,6 @@ nothing: any `send-email` agent drafts and VALOR sends.
 
 | `acts_as` | Needed for |
 |---|---|
-| `outbound-mailbox` | the seed test for a new mailbox in `ready-sender` |
 | `domain-registrar` | buying and authenticating the sending domain |
 | `calendar` | booking meetings |
 
@@ -124,7 +125,8 @@ agents `research` and two `writing`, so peer review has a reviewer who is not th
 | `verifier` | `verify(email)` | `status`: `valid`, `catch_all`, `risky`, `invalid` |
 | `mailbox` | `sent(to)`, `replies(from)` | `message_id, to, subject, body_sha256, sent_at` (live: connector type `mailbox`, IMAP) |
 | `dns` | `auth(domain)` | `spf, dkim, dmarc, mx` (live: connector type `dns`) |
-| `seeds` | `placement(subject)` | `seed, folder` (`inbox` or `spam`) |
+| `deliverability` | `health(mailbox)` | `mailbox, score (0-100), warmup (active, inactive, paused), spam_rate, blocked, blocked_reason, connected` (live: connector type `smartlead`, API key in the vault) |
+| `clock` | `daily` | one row a day, to start `mailbox-health` (connector type `clock`) |
 | `calendar` | `event(id)`, `attended(attendee)` | `id, start, attendees, status` |
 
 `body_sha256` is the SHA-256 of the body with LF line ends, trailing spaces removed and trimmed (`lib/email.mjs`
@@ -133,10 +135,17 @@ agents `research` and two `writing`, so peer review has a reviewer who is not th
 **Listeners** on the mailbox source, all code only (copy them from `examples/workspace/listeners`):
 `mailbox-optout` (opt-out wording → `suppression`), `mailbox-replied` (→ `replied`), `mailbox-bounced` (→ `bounced`),
 `mailbox-sent` (→ `sent`, the bounce-rate denominator) and `mailbox-reply` (starts `handle-reply` at low trust).
+On the clock source: `daily-mailbox-health` (starts `mailbox-health` once a day).
 The mailbox adapter sets `kind` on each event: `reply`, `bounce`, `sent` or `auto_reply`.
 
 **Grants**: work started by a reply runs at low trust, so grant `initiator:trust:low` query access to `campaigns`,
-`senders` and `contacts#known`, and nothing else.
+`senders` and `contacts#known`, and nothing else. The daily check runs at high trust and reads `deliverability`; give
+the play itself `{ principal: "play:mailbox-health", resource: "resource:warmup#start_warmup", role: act }` so VALOR
+may start warmup for a held mailbox.
+
+**Warmup resource**: the warmup provider's account in the vault, `resources/warmup.yaml`, with action `start_warmup`
+(`requires: grant`). Reference: `actuator: { type: smartlead }`, `credentials: secret://smartlead-api-key`. Each
+mailbox must already be added in the provider (it needs the mailbox login to warm it).
 
 **Sending lanes** (one row per mailbox in `senders`):
 
@@ -145,8 +154,10 @@ id: alex                     # the lane id goals and sequences refer to
 resource: mailbox-alex       # the vault resource VALOR sends from
 name, company, mailbox, domain, primary_domain, postal_address, opt_out_line
 daily_cap: 25                # per mailbox, across every goal
-status: active               # active | warming | planned | paused; only active lanes send
-warmup_days, setup_budget_usd, seed_inboxes, min_inbox_share   # for ready-sender
+status: active               # active | warming | planned | paused; only active lanes not held by mailbox-health send
+min_health_score: 90         # mailbox-health clears the lane at or above this; max_spam_rate: 0.03
+warmup_resource: warmup      # optional, default warmup
+setup_budget_usd             # for ready-sender
 ```
 
 **Campaign settings** (one record per goal in `campaigns`; the `load` step joins it with the run's lane, so every check

@@ -12,16 +12,8 @@
       "opt_out_line": "Not relevant? Reply \"no\" and I won't write again.",
       "daily_cap": 25,
       "status": "active",
-      "warmup_days": 14,
       "setup_budget_usd": 80,
-      "seed_inboxes": [
-        "seed1@example.test",
-        "seed2@example.test",
-        "seed3@example.test",
-        "seed4@example.test",
-        "seed5@example.test"
-      ],
-      "min_inbox_share": 0.8
+      "min_health_score": 90
     }
   ]
 }

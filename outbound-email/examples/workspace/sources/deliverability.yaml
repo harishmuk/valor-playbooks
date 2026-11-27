@@ -1,0 +1,9 @@
+# Mailbox health from the warmup and deliverability provider, read-only. One row per mailbox:
+# { mailbox, score (0-100), warmup: active|inactive|paused, spam_rate, blocked, blocked_reason, connected }.
+# Live (Smartlead): connector { type: smartlead }, credentials: secret://smartlead-api-key
+id: deliverability
+kind: other
+connector: { type: fixture, data: data/deliverability.json }
+description: "Mailbox health and warmup state, per mailbox."
+queries:
+  health: { params: [mailbox] }
