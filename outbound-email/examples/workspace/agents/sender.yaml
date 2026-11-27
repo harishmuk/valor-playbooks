@@ -2,5 +2,5 @@ id: sender
 name: sender
 task_types: [send-email, sender-setup, scheduling]
 reach: { kind: fixture }
-acts_as: [outbound-mailbox, domain-registrar, calendar]
+acts_as: [domain-registrar, calendar, outbound-mailbox]
 limits: { concurrency: 50, cost_per_run_usd: 0.1 }

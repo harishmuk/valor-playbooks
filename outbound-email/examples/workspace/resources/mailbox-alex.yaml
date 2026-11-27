@@ -1,0 +1,12 @@
+# A company mailbox in VALOR's vault. Agents never get its credential: VALOR sends approved drafts from it.
+# This sample records sends into data/mailbox.json (the same file the read-only mailbox source reads back).
+# Live, the actuator is { type: gmail, mailbox: alex@... } with credentials: secret://mailbox-alex (send scope).
+id: mailbox-alex
+name: Alex Rivera's sending mailbox
+kind: mailbox
+actuator: { type: fixture, data: data/mailbox.json, record_as: { send: sent }, mailbox: alex@northwindledger-mail.test }
+actions:
+  send:
+    description: "Send one email from this mailbox: to, subject, body, and thread_id for a reply in the same thread."
+    params: [to, subject, body, thread_id]
+    requires: owner_approval

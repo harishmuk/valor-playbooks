@@ -5,6 +5,7 @@
       "name": "Alex Rivera",
       "company": "Northwind Ledger",
       "mailbox": "alex@northwindledger-mail.test",
+      "resource": "mailbox-alex",
       "domain": "northwindledger-mail.test",
       "primary_domain": "northwindledger.test",
       "postal_address": "Northwind Ledger, 100 Example Street, Springfield, IL 62701",

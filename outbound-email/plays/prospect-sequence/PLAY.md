@@ -49,14 +49,13 @@ steps:
     title: "Send email 1 to {{inputs.email}}"
     task_type: send-email
     skills: [send-approved-email]
-    requires_acts_as: [outbound-mailbox]
     brief: |
       Prepare email 1 of sequence {{steps.write.output.id}} for {{inputs.email}} exactly as written: same subject, same body.
-      Return it as your draft with the whole sequence alongside, so the approval covers the sequence. Send nothing yet.
-      After the go-ahead, send it once from {{steps.load.output.campaign.sender.mailbox}}, carrying the go-ahead's idempotency key,
-      and report the message id as a pointer.
+      Return it as your draft (to, subject, body) with the whole sequence alongside, so the approval covers the sequence.
+      You send nothing: once the owner approves, VALOR sends it from {{steps.load.output.campaign.sender.mailbox}} in a paced slot.
     done_when: "The sent folder shows exactly one message to the recipient whose body matches the approved text."
-    approval: { action: "send email 1 of the sequence to {{inputs.email}}", idempotency_key: "{{inputs.campaign}}:{{inputs.email}}:1", paced: true }
+    approval: { action: "send email 1 of the sequence to {{inputs.email}}", idempotency_key: "{{inputs.campaign}}:{{inputs.email}}:1", paced: true,
+      act: { resource: "{{inputs.steps.load.output.campaign.sender.resource}}", action: send, params: { to: "{{draft.to}}", subject: "{{draft.subject}}", body: "{{draft.body}}" } } }
     checks:
       - { id: matches-sequence, kind: code, run: checks/matches-sequence.mjs }
       - { id: sent, kind: read_back }
@@ -73,12 +72,12 @@ steps:
     when: { all: [{ field: steps.recheck-1.output.go, op: eq, value: true }, { field: steps.write.output.emails.1.body, op: exists }] }
     task_type: send-email
     skills: [send-approved-email]
-    requires_acts_as: [outbound-mailbox]
     brief: |
-      Prepare email 2 of the approved sequence {{steps.write.output.id}} for {{inputs.email}}, word for word, as a reply in the same thread.
-      After the go-ahead, send it once with the go-ahead's idempotency key and report the message id.
+      Prepare email 2 of the approved sequence {{steps.write.output.id}} for {{inputs.email}}, word for word (to, subject, body).
+      You send nothing: VALOR sends it in the same thread from the lane's mailbox once it is approved.
     done_when: "The sent folder shows exactly one copy of email 2 to the recipient, matching the approved text."
-    approval: { action: "send email 2 of the approved sequence to {{inputs.email}}", idempotency_key: "{{inputs.campaign}}:{{inputs.email}}:2", paced: true }
+    approval: { action: "send email 2 of the approved sequence to {{inputs.email}}", idempotency_key: "{{inputs.campaign}}:{{inputs.email}}:2", paced: true,
+      act: { resource: "{{inputs.steps.load.output.campaign.sender.resource}}", action: send, params: { to: "{{draft.to}}", subject: "{{draft.subject}}", body: "{{draft.body}}", thread_id: "{{inputs.steps.send-1.output.pointer.thread_id}}" } } }
     checks:
       - { id: matches-sequence, kind: code, run: checks/matches-sequence.mjs }
       - { id: sent, kind: read_back }
@@ -95,12 +94,12 @@ steps:
     when: { all: [{ field: steps.recheck-2.output.go, op: eq, value: true }, { field: steps.write.output.emails.2.body, op: exists }] }
     task_type: send-email
     skills: [send-approved-email]
-    requires_acts_as: [outbound-mailbox]
     brief: |
-      Prepare email 3, the last, of the approved sequence {{steps.write.output.id}} for {{inputs.email}}, word for word, in the same thread.
-      After the go-ahead, send it once with the go-ahead's idempotency key and report the message id.
+      Prepare email 3, the last, of the approved sequence {{steps.write.output.id}} for {{inputs.email}}, word for word (to, subject, body).
+      You send nothing: VALOR sends it in the same thread from the lane's mailbox once it is approved.
     done_when: "The sent folder shows exactly one copy of email 3 to the recipient, matching the approved text."
-    approval: { action: "send email 3 of the approved sequence to {{inputs.email}}", idempotency_key: "{{inputs.campaign}}:{{inputs.email}}:3", paced: true }
+    approval: { action: "send email 3 of the approved sequence to {{inputs.email}}", idempotency_key: "{{inputs.campaign}}:{{inputs.email}}:3", paced: true,
+      act: { resource: "{{inputs.steps.load.output.campaign.sender.resource}}", action: send, params: { to: "{{draft.to}}", subject: "{{draft.subject}}", body: "{{draft.body}}", thread_id: "{{inputs.steps.send-1.output.pointer.thread_id}}" } } }
     checks:
       - { id: matches-sequence, kind: code, run: checks/matches-sequence.mjs }
       - { id: sent, kind: read_back }

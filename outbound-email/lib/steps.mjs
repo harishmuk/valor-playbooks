@@ -4,7 +4,7 @@ import { lower, onList } from "./email.mjs";
 /**
  * Sending lanes: the workspace's mailboxes, set up once and shared by every goal. One row per mailbox in the `senders`
  * source: id, name, company, mailbox, domain, primary_domain, postal_address, opt_out_line, daily_cap, status
- * (active | warming | planned | paused), and for setup: warmup_days, setup_budget_usd, seed_inboxes, min_inbox_share.
+ * (active | warming | planned | paused), resource (the vault resource VALOR sends from), and for setup: warmup_days, setup_budget_usd, seed_inboxes, min_inbox_share.
  */
 export async function loadLanes(ctx) {
   return ctx.query("senders", "get", {});

@@ -64,7 +64,13 @@ describe("outbound email playbook", () => {
     expect(t.world.sent("dana@harborlane.test")).toHaveLength(1);
     await t.run(8 * DAY, 4 * HOUR);
     s = await t.eng.state();
-    expect(t.world.sent("dana@harborlane.test")).toHaveLength(3);
+    const sent = t.world.sent("dana@harborlane.test");
+    expect(sent).toHaveLength(3);
+    // VALOR sent all three from the lane's mailbox in the vault; the follow-ups went in the first email's thread
+    expect(sent.map((m: any) => m.from)).toEqual(Array(3).fill("alex@northwindledger-mail.test"));
+    expect(sent.slice(1).map((m: any) => m.thread_id)).toEqual([sent[0].message_id, sent[0].message_id]);
+    expect(s.events.filter((e: any) => e.kind === "resource.acted").map((e: any) => [e.data.resource, e.data.agent])).toEqual(Array(3).fill(["mailbox-alex", null]));
+    expect(s.events.some((e: any) => e.kind === "goahead.sent" || (e.kind === "run.submitted" && /^Acted:/.test(e.data.submission.summary)))).toBe(false);
     expect(stepStatus(s, pr)).toMatchObject({ "send-1": "done", "send-2": "done", "send-3": "done" });
     expect(s.playRuns.get(pr)!.status).toBe("done");
     // only one owner approval in the whole run; the rest were standing approvals
@@ -183,15 +189,16 @@ describe("outbound email playbook", () => {
     expect(t2.world.sent()).toHaveLength(0);
   });
 
-  it("proof of send: a duplicate send fails the task; the sent folder decides, not the agent", async () => {
+  it("proof of send: VALOR sends once from the vault's mailbox; a copy sent around VALOR fails the check", async () => {
     let t: any;
-    const dup = () => sender({ add: (...a: any[]) => t.world.add(...a), sent: (x: any) => t.world.sent(x), read: (n: string) => t.world.read(n) } as any, () => t.eng, { sendTwice: true });
-    t = await withCast({ sender: dup(), "backup-sender": dup() });
+    const around = () => sender({ add: (...a: any[]) => t.world.add(...a), sent: (x: any) => t.world.sent(x), read: (n: string) => t.world.read(n) } as any, () => t.eng, { goesAround: true });
+    t = await withCast({ sender: around(), "backup-sender": around() });
     await startPlayRun(t.eng, { play: "prospect-sequence", goal: "outreach", inputs: DANA });
     await t.settle();
     await t.approveAll();
     await t.run(2 * HOUR);
     const s = await t.eng.state();
+    expect(s.events.filter((e: any) => e.kind === "resource.acted" && e.data.resource === "mailbox-alex")).toHaveLength(1);
     expect(s.events.some((e: any) => e.kind === "review.recorded" && JSON.stringify(e.data.reasons).includes("the approved email was sent 2 times"))).toBe(true);
     const send1 = [...s.tasks.values()].find((x: any) => x.step_id === "send-1")!;
     expect(send1.status).not.toBe("done");

@@ -20,6 +20,8 @@ export default function (ctx) {
   // spread the list over the campaign's sending lanes, in rank order, so each mailbox gets an even share
   const lanes = c.lanes ?? [];
   if (!lanes.length) throw new Error("no active sending lane: add a mailbox to the senders source (status: active)");
+  const unbound = lanes.filter((l) => !l.resource).map((l) => l.id);
+  if (unbound.length) throw new Error(`active lanes with no mailbox resource for VALOR to send from: ${unbound.join(", ")} (set resource on the lane)`);
   const byLane = {};
   prospects.forEach((p, i) => {
     const l = lanes[i % lanes.length];

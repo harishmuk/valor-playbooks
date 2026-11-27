@@ -52,12 +52,14 @@ steps:
     title: "Send the reply to {{inputs.event.from}}"
     task_type: send-email
     skills: [send-approved-email]
-    requires_acts_as: [outbound-mailbox]
     brief: |
-      Prepare the written reply {{steps.respond.output.id}} to {{inputs.event.from}} exactly as written, in the same thread. Send nothing yet.
-      After the go-ahead, send it once with the go-ahead's idempotency key and report the message id.
+      Prepare the written reply {{steps.respond.output.id}} to {{inputs.event.from}} exactly as written (to, subject, body).
+      You send nothing: once the owner approves, VALOR sends it in the same thread from the mailbox the reply came to.
     done_when: "The sent folder shows exactly one message to the person with the approved body."
-    approval: { action: "reply to {{inputs.event.from}}", idempotency_key: "{{inputs.campaign}}:{{inputs.event.message_id}}:reply" }
+    approval:
+      action: "reply to {{inputs.event.from}}"
+      idempotency_key: "{{inputs.campaign}}:{{inputs.event.message_id}}:reply"
+      act: { resource: "{{inputs.steps.load.output.campaign.sender.resource}}", action: send, params: { to: "{{draft.to}}", subject: "{{draft.subject}}", body: "{{draft.body}}", thread_id: "{{inputs.event.thread_id}}" } }
     checks:
       - { id: matches-response, kind: code, run: checks/matches-response.mjs }
       - { id: sent, kind: read_back }

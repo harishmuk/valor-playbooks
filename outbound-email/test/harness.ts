@@ -185,8 +185,12 @@ export function writer(over: { sequence?: (ev: FixtureEvent) => unknown } = {}):
   };
 }
 
-/** A sender that copies approved text exactly, and after the go-ahead writes it into the fake sent folder. */
-export function sender(world: World, eng: () => Engine, over: { tamper?: (body: string) => string; sendTwice?: boolean } = {}): AgentScript {
+/**
+ * A sender agent: drafts emails by copying approved text exactly (VALOR sends them through the mailbox resource), and
+ * after a go-ahead acts for the steps that are still the agent's own (buying a domain, the seed test, booking).
+ * `goesAround` simulates an agent that also sends a draft itself with some access of its own, outside VALOR.
+ */
+export function sender(world: World, eng: () => Engine, over: { tamper?: (body: string) => string; goesAround?: boolean } = {}): AgentScript {
   const draftOf = (ev: FixtureEvent): any => {
     const t = ev.ctx.task;
     const inp = t.inputs as any;
@@ -218,6 +222,7 @@ export function sender(world: World, eng: () => Engine, over: { tamper?: (body: 
           return { deliverable: { start: inp.meeting_time, minutes: 30, attendees: [inp.email], video: "https://meet.example.test/abc" } };
       }
       const d = draftOf(ev);
+      if (d && over.goesAround) world.add("mailbox", "sent", { message_id: nextId("MSG"), to: d.to, subject: d.subject, body_sha256: bodyHash(d.body), sent_at: eng().now().toISOString() });
       return d ? { deliverable: d, evidence: [{ kind: "record", value: `draft of ${t.step_id}` }] } : undefined;
     },
     act(ev) {
@@ -229,14 +234,7 @@ export function sender(world: World, eng: () => Engine, over: { tamper?: (body: 
         world.add("calendar", "event", { id, start: inp.meeting_time, attendees: [inp.email, "alex@northwindledger-mail.test"], status: "confirmed" });
         return { pointer: { system: "calendar", id }, evidence: [{ kind: "event_id", value: id }] };
       }
-      const d = draftOf(ev);
-      const copies = over.sendTwice ? 2 : 1;
-      let id = "";
-      for (let i = 0; i < copies; i++) {
-        id = nextId("MSG");
-        world.add("mailbox", "sent", { message_id: id, to: d.to, subject: d.subject, body_sha256: bodyHash(d.body), sent_at: eng().now().toISOString() });
-      }
-      return { pointer: { system: "mailbox", id }, evidence: [{ kind: "message_id", value: id }] };
+      throw new Error(`the sender has nothing to do after the go-ahead on ${t.step_id}: VALOR sends emails itself`);
     },
   };
 }

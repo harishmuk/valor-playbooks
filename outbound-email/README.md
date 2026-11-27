@@ -42,9 +42,12 @@ not legal advice.
 
 ## How it proves work
 
+- **Agents draft; VALOR sends.** Each mailbox is a company resource in VALOR's vault (`resources/`). After the owner's
+  approval, VALOR sends exactly the approved draft from the lane's mailbox under the go-ahead's idempotency key, once.
+  No agent holds a mailbox credential, so adding or swapping an agent needs no mailbox setup.
 - **Sends are read back, not reported.** `proof-of-send` reads the mailbox source and passes only if exactly one
-  message to the recipient has the approved body's hash, and the agent's reported message id is that message. A second
-  copy, a changed text or a send before the go-ahead fails the task.
+  message to the recipient has the approved body's hash, and it is the message VALOR sent. A copy sent around VALOR
+  or a changed text fails the task.
 - **Follow-ups are the approved text, word for word.** `matches-sequence` compares each send with the sequence the
   owner approved at email 1. That is what makes the standing approvals for follow-ups safe.
 - **Bookings are read from the calendar**, DNS from public DNS, placement from the seed inboxes.
@@ -73,11 +76,26 @@ listeners serves every goal.
 The playbook declares what it needs; the workspace binds it. `examples/workspace` is a complete, runnable example
 with invented data.
 
-**Agents** (they own their tools; the playbook only says what they must be able to act as):
+**Resources** (company access held in VALOR's vault, one file per mailbox in `resources/`). VALOR performs the
+approved action with the credential; agents never see it:
+
+```yaml
+id: mailbox-alex
+kind: mailbox
+actuator: { type: gmail, mailbox: alex@example.com }   # rehearsal and tests: { type: fixture, data: data/mailbox.json, record_as: { send: sent } }
+credentials: secret://mailbox-alex                      # the company's OAuth grant for this mailbox (send scope)
+actions:
+  send: { params: [to, subject, body, thread_id], requires: owner_approval }
+```
+
+Each lane names its mailbox's resource (`resource: mailbox-alex`). Emails to prospects and replies go through it.
+
+**Agents** (they own their tools; the playbook only says what they must be able to act as). Sending an email needs
+nothing: any `send-email` agent drafts and VALOR sends.
 
 | `acts_as` | Needed for |
 |---|---|
-| `outbound-mailbox` | every send (`send-email` tasks), the seed test |
+| `outbound-mailbox` | the seed test for a new mailbox in `ready-sender` |
 | `domain-registrar` | buying and authenticating the sending domain |
 | `calendar` | booking meetings |
 
@@ -113,6 +131,7 @@ The mailbox adapter sets `kind` on each event: `reply`, `bounce`, `sent` or `aut
 
 ```yaml
 id: alex                     # the lane id goals and sequences refer to
+resource: mailbox-alex       # the vault resource VALOR sends from
 name, company, mailbox, domain, primary_domain, postal_address, opt_out_line
 daily_cap: 25                # per mailbox, across every goal
 status: active               # active | warming | planned | paused; only active lanes send
