@@ -58,3 +58,40 @@ export async function doNotContactReason(ctx, email, campaign) {
 export function addDays(now, days) {
   return new Date(now.getTime() + days * 86400e3).toISOString();
 }
+
+/**
+ * Deliverability of each sending lane, read by VALOR from public DNS (the `dns` source), code only:
+ * - the sending domain publishes SPF (exactly one record), DKIM (a selector resolves), DMARC and MX;
+ * - the lane never sends from the main domain (primary_domain), so cold outreach cannot hurt the company's own mail;
+ * - the main domain publishes DMARC (a warning only: it protects the brand, it does not block sending).
+ * A lane that fails is left out of the list; if every lane fails, the list is not built.
+ */
+export async function laneHealth(ctx, lanes) {
+  const healthy = [];
+  const failed = [];
+  const warnings = [];
+  const auth = async (domain) => (domain ? ((await ctx.query("dns", "auth", { domain })) ?? [])[0] : undefined);
+  for (const l of lanes) {
+    const reasons = [];
+    const domain = lower(l.domain ?? String(l.mailbox ?? "").split("@")[1] ?? "");
+    const main = lower(l.primary_domain ?? "");
+    if (!domain) reasons.push("no sending domain");
+    if (main && domain === main) reasons.push(`sends from the main domain ${main}; use a separate sending domain`);
+    const rec = await auth(domain);
+    if (domain && !rec) reasons.push(`no DNS answer for ${domain}`);
+    if (rec) {
+      if (!/^v=spf1\b/i.test(String(rec.spf ?? ""))) reasons.push(`${domain}: ${String(rec.spf ?? "").startsWith("MULTIPLE") ? "more than one SPF record" : "no SPF record"}`);
+      if (rec.dkim !== true) reasons.push(`${domain}: DKIM not found`);
+      if (!/^v=DMARC1\b/i.test(String(rec.dmarc ?? ""))) reasons.push(`${domain}: no DMARC record`);
+      if (!Array.isArray(rec.mx) || !rec.mx.length) reasons.push(`${domain}: no MX records, so replies and bounces cannot arrive`);
+    }
+    if (main && main !== domain) {
+      const m = await auth(main);
+      if (!m || !/^v=DMARC1\b/i.test(String(m.dmarc ?? ""))) warnings.push(`${l.id}: main domain ${main} has no DMARC record`);
+    }
+    if (reasons.length) failed.push({ id: l.id, reasons });
+    else healthy.push(l.id);
+  }
+  const summary = `${healthy.length} of ${lanes.length} lanes ready${failed.length ? `; not ready: ${failed.map((f) => `${f.id} (${f.reasons.join("; ")})`).join(", ")}` : ""}`;
+  return { healthy, failed, warnings, summary };
+}

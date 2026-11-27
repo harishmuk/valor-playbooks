@@ -59,7 +59,7 @@ steps:
     approval:
       action: "reply to {{inputs.event.from}}"
       idempotency_key: "{{inputs.campaign}}:{{inputs.event.message_id}}:reply"
-      act: { resource: "{{inputs.steps.load.output.campaign.sender.resource}}", action: send, params: { to: "{{draft.to}}", subject: "{{draft.subject}}", body: "{{draft.body}}", thread_id: "{{inputs.event.thread_id}}" } }
+      act: { resource: "{{inputs.steps.load.output.campaign.sender.resource}}", action: send, params: { to: "{{draft.to}}", subject: "{{draft.subject}}", body: "{{draft.body}}", thread_id: "{{inputs.event.thread_id}}", in_reply_to: "{{inputs.event.rfc822_id}}" } }
     checks:
       - { id: matches-response, kind: code, run: checks/matches-response.mjs }
       - { id: sent, kind: read_back }

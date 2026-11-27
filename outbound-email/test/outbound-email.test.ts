@@ -41,7 +41,7 @@ describe("outbound email playbook", () => {
   it("loads on the core with no validation issues", () => {
     const { ws, issues } = loadWorkspace(sampleWorkspace());
     expect(issues).toEqual([]);
-    expect([...ws.plays.keys()].sort()).toEqual(["book-meeting", "build-list", "handle-reply", "prospect-sequence", "ready-sender"]);
+    expect([...ws.plays.keys()].sort()).toEqual(["book-meeting", "build-list", "check-lanes", "handle-reply", "prospect-sequence", "ready-sender"]);
     expect(ws.skills.size).toBe(9);
     expect([...ws.guards.keys()].sort()).toEqual(["bounce-rate", "claims-only", "sender-compliance", "stop-on-reply", "suppression"]);
   });
@@ -345,6 +345,46 @@ describe("sending lanes are workspace resources; each goal brings only its campa
     // sam's sequences write from sam, with sam's footer identity
     const samRun = kids.find((k) => k.inputs.sender === "sam")!;
     expect((samRun.steps.load.output as any).campaign.sender.mailbox).toBe("sam@northwindledger-mail.test");
+  });
+
+  it("lanes are checked in public DNS first: a lane without DKIM, or one sending from the main domain, is left out", async () => {
+    const root = sampleWorkspace();
+    const f = join(root, "data", "senders.json");
+    const d = JSON.parse(readFileSync(f, "utf8"));
+    d.get.push({ ...d.get[0], id: "sam", mailbox: "sam@samsend.test", domain: "samsend.test", resource: "mailbox-alex" });
+    d.get.push({ ...d.get[0], id: "main", mailbox: "hello@northwindledger.test", domain: "northwindledger.test", resource: "mailbox-alex" });
+    writeFileSync(f, JSON.stringify(d));
+    const df = join(root, "data", "dns.json");
+    const dns = JSON.parse(readFileSync(df, "utf8"));
+    dns.auth.push({ domain: "samsend.test", spf: "v=spf1 include:spf.privateemail.com ~all", dkim: false, dmarc: "v=DMARC1; p=none", mx: ["mx1.privateemail.com"] });
+    dns.auth.push({ domain: "northwindledger.test", spf: "v=spf1 -all", dkim: true, dmarc: "v=DMARC1; p=reject", mx: ["mx.northwindledger.test"] });
+    writeFileSync(df, JSON.stringify(dns));
+    const cf = join(root, "data", "campaigns.json");
+    const c = JSON.parse(readFileSync(cf, "utf8"));
+    delete c.get[0].senders;
+    writeFileSync(cf, JSON.stringify(c));
+    const t = await withCast({}, { root });
+    const check = await startPlayRun(t.eng, { play: "check-lanes", goal: "outreach", inputs: { campaign: "spring-agencies" } });
+    await t.settle();
+    let s = await t.eng.state();
+    const rep = s.playRuns.get(check)!.steps.lanes.output as any;
+    expect(rep.healthy).toEqual(["alex"]);
+    expect(rep.failed).toEqual([
+      { id: "sam", reasons: ["samsend.test: DKIM not found"] },
+      { id: "main", reasons: ["sends from the main domain northwindledger.test; use a separate sending domain"] },
+    ]);
+    const pr = await startPlayRun(t.eng, { play: "build-list", goal: "outreach", inputs: { campaign: "spring-agencies" } });
+    await t.settle();
+    s = await t.eng.state();
+    expect((s.playRuns.get(pr)!.steps.select.output as any).by_sender).toEqual({ alex: 4 });
+    // with no lane ready, no list is built
+    dns.auth = dns.auth.map((r: any) => ({ ...r, dkim: false }));
+    writeFileSync(df, JSON.stringify(dns));
+    const pr2 = await startPlayRun(t.eng, { play: "build-list", goal: "outreach", inputs: { campaign: "spring-agencies" } });
+    await t.settle();
+    s = await t.eng.state();
+    expect(s.playRuns.get(pr2)!.steps.lanes.status).toBe("failed");
+    expect(String(s.playRuns.get(pr2)!.steps.lanes.error)).toContain("no sending lane is ready");
   });
 
   it("a reply from someone in no sequence is recorded and starts nothing", async () => {

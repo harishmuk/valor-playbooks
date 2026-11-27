@@ -2,13 +2,17 @@
 id: build-list
 version: 1
 title: Build the target list
-description: Pull candidates from the prospect source, remove anyone we must not email, have an agent qualify them against the audience, verify addresses, pick the list with segment caps, get the owner's approval, then start one Prospect sequence per person.
+description: Check every sending lane's DNS, pull candidates from the prospect source, remove anyone we must not email, have an agent qualify them against the audience, verify addresses, pick the list with segment caps, get the owner's approval, then start one Prospect sequence per person.
 inputs: { required: [campaign] }
-scope: { sources: [campaigns, senders, prospects, contacts, verifier] }
+scope: { sources: [campaigns, senders, prospects, contacts, verifier, dns] }
 steps:
   - id: load
     kind: code
     run: steps/load.mjs
+
+  - id: lanes
+    kind: code
+    run: steps/lanes.mjs
 
   - id: pull
     kind: code

@@ -6,5 +6,5 @@ why: Sample goal that exercises every play in the outbound email playbook with f
 done_when: Every approved prospect has had email 1 proven sent from the sent folder, every sequence has finished or stopped on a reply, and nothing went to anyone on the suppression list.
 metric: { name: meetings held, source: calendar, query: attended, target: 2 }
 labels: [outbound]
-plays: [ready-sender, build-list, prospect-sequence, handle-reply, book-meeting]
+plays: [ready-sender, check-lanes, build-list, prospect-sequence, handle-reply, book-meeting]
 ---

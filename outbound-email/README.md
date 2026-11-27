@@ -77,18 +77,29 @@ The playbook declares what it needs; the workspace binds it. `examples/workspace
 with invented data.
 
 **Resources** (company access held in VALOR's vault, one file per mailbox in `resources/`). VALOR performs the
-approved action with the credential; agents never see it:
+approved action with the credential; agents never see it. Every mailbox connects the same way, whoever hosts it
+(Google Workspace with an app password, Namecheap Private Email, Zoho, Fastmail, any IMAP/SMTP server):
+
+```sh
+valor mailbox add alex@example.com --provider namecheap-private-email --lane alex --name "Alex Rivera"
+```
+
+asks for the password (hidden), stores it in the vault, and writes:
 
 ```yaml
 id: mailbox-alex
 kind: mailbox
-actuator: { type: gmail, mailbox: alex@example.com }   # rehearsal and tests: { type: fixture, data: data/mailbox.json, record_as: { send: sent } }
-credentials: secret://mailbox-alex                      # the company's OAuth grant for this mailbox (send scope)
+actuator: { type: mailbox, provider: namecheap-private-email, mailbox: alex@example.com, from_name: Alex Rivera }
+credentials: secret://mailbox-alex
 actions:
-  send: { params: [to, subject, body, thread_id], requires: owner_approval }
+  send: { params: [to, subject, body, thread_id, in_reply_to], requires: owner_approval }
 ```
 
-Each lane names its mailbox's resource (`resource: mailbox-alex`). Emails to prospects and replies go through it.
+Rehearsal and tests use `{ type: fixture, data: data/mailbox.json, record_as: { send: sent } }` instead. Each lane names
+its mailbox's resource (`resource: mailbox-alex`). Emails to prospects and replies go through it.
+
+**Deliverability**: `check-lanes` (and the first step of `build-list`) reads public DNS for each lane: SPF, DKIM, DMARC
+and MX on the sending domain, and that no lane sends from the main domain. A lane that is not ready is left out.
 
 **Agents** (they own their tools; the playbook only says what they must be able to act as). Sending an email needs
 nothing: any `send-email` agent drafts and VALOR sends.
@@ -111,8 +122,8 @@ agents `research` and two `writing`, so peer review has a reviewer who is not th
 | `prospects` | `search(saved_search)` | `email, name, title, company, tz` |
 | `contacts` | `known(email)` | existing relationships, to exclude |
 | `verifier` | `verify(email)` | `status`: `valid`, `catch_all`, `risky`, `invalid` |
-| `mailbox` | `sent(to)`, `replies(from)` | `message_id, to, subject, body_sha256, sent_at` |
-| `dns` | `auth(domain)` | `spf, dkim, dmarc, mx` |
+| `mailbox` | `sent(to)`, `replies(from)` | `message_id, to, subject, body_sha256, sent_at` (live: connector type `mailbox`, IMAP) |
+| `dns` | `auth(domain)` | `spf, dkim, dmarc, mx` (live: connector type `dns`) |
 | `seeds` | `placement(subject)` | `seed, folder` (`inbox` or `spam`) |
 | `calendar` | `event(id)`, `attended(attendee)` | `id, start, attendees, status` |
 
