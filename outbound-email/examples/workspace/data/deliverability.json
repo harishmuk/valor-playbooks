@@ -1,0 +1,1 @@
+{ "health": [ { "mailbox": "alex@northwindledger-mail.test", "score": 97, "warmup": "active", "spam_rate": 0.01, "blocked": false, "connected": true } ] }

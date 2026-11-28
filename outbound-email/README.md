@@ -11,7 +11,9 @@ playbook, and the customer's workspace is the last layer on top.
 
 | Play | What it does | Started by |
 |---|---|---|
-| `ready-sender` | Proposes a separate sending domain and its costs (owner approves the spend), authenticates it, waits out warmup, then proves inbox placement from seed inboxes | the owner, once per sending domain |
+| `mailbox-health` | Reads every mailbox's health from the warmup provider (Smartlead or any other). At or above the lane's threshold: cleared to send. Under it: held (no new prospects, queued sends wait) and VALOR starts its warmup. Code only | a daily clock listener (a standing goal) |
+| `check-lanes` | Reads each sending domain's SPF, DKIM, DMARC and MX from public DNS, and that no lane sends from the main domain | the owner, any time; also the first step of `build-list` |
+| `ready-sender` | Proposes a separate sending domain and its costs (owner approves the spend), authenticates it, then has the owner connect it to VALOR and the warmup provider. `mailbox-health` holds it until warm | the owner, once per new mailbox (skip it for mailboxes that already exist) |
 | `build-list` | Pulls candidates from the prospect source, removes anyone we must not email, has an agent qualify them, verifies addresses, picks the list with segment caps, gets the owner's approval, starts one sequence per person | the owner, once per campaign |
 | `prospect-sequence` | Researches one person, writes the sequence (peer reviewed), owner approves email 1 with the whole sequence, sends in paced slots, proves each send from the sent folder, re-checks before each follow-up | `build-list`, or a referral |
 | `handle-reply` | Triages a reply into a fixed label with a verbatim quote, then answers (owner approves), books, takes a referral or brings it to the owner | the reply listener, at low trust |
@@ -42,24 +44,70 @@ not legal advice.
 
 ## How it proves work
 
+- **Agents draft; VALOR sends.** Each mailbox is a company resource in VALOR's vault (`resources/`). After the owner's
+  approval, VALOR sends exactly the approved draft from the lane's mailbox under the go-ahead's idempotency key, once.
+  No agent holds a mailbox credential, so adding or swapping an agent needs no mailbox setup.
 - **Sends are read back, not reported.** `proof-of-send` reads the mailbox source and passes only if exactly one
-  message to the recipient has the approved body's hash, and the agent's reported message id is that message. A second
-  copy, a changed text or a send before the go-ahead fails the task.
+  message to the recipient has the approved body's hash, and it is the message VALOR sent. A copy sent around VALOR
+  or a changed text fails the task.
 - **Follow-ups are the approved text, word for word.** `matches-sequence` compares each send with the sequence the
   owner approved at email 1. That is what makes the standing approvals for follow-ups safe.
-- **Bookings are read from the calendar**, DNS from public DNS, placement from the seed inboxes.
+- **Bookings are read from the calendar**, DNS from public DNS, mailbox health from the warmup provider.
 - **Claims are code-checked.** Every figure in an email must appear in the campaign's allowed claims or its ask.
+
+## Two layers of settings: sending lanes and goals
+
+The email infrastructure is set up **once per workspace** and shared; each outbound motion is a **goal** that brings
+only who to reach and what to say.
+
+| Set once, in the workspace (`senders` source) | Per goal (`campaigns` source, one record per motion) |
+|---|---|
+| each mailbox as a sending lane: address, sender name and company, domain, main domain to protect | who to reach: audience, saved search, list size, segments, exclusions |
+| footer: postal address, opt-out line | the offer: the ask, allowed claims, pain points |
+| a daily cap per mailbox, shared by every goal and play sending from it | writing rules: touches, word limits, banned phrases |
+| status: `active`, `warming`, `planned`, `paused` | which lanes to use (`senders: [ids]`, default: every active lane) |
+| health: minimum health score and spam rate (mailbox-health), setup budget | research freshness, bounce limits, meeting length |
+
+`build-list` spreads a goal's list over its lanes. Each `prospect-sequence` carries its lane (`sender`) and that lane's
+cap, and pacing keys on the lane across the workspace, so two goals can never push one mailbox past its cap. A reply
+joins the goal and lane of the sequence it answers (the reply listener `follows` that run), so one set of mailbox
+listeners serves every goal.
 
 ## What a workspace supplies
 
 The playbook declares what it needs; the workspace binds it. `examples/workspace` is a complete, runnable example
 with invented data.
 
-**Agents** (they own their tools; the playbook only says what they must be able to act as):
+**Resources** (company access held in VALOR's vault, one file per mailbox in `resources/`). VALOR performs the
+approved action with the credential; agents never see it. Every mailbox connects the same way, whoever hosts it
+(Google Workspace with an app password, Namecheap Private Email, Zoho, Fastmail, any IMAP/SMTP server):
+
+```sh
+valor mailbox add alex@example.com --provider namecheap-private-email --lane alex --name "Alex Rivera"
+```
+
+asks for the password (hidden), stores it in the vault, and writes:
+
+```yaml
+id: mailbox-alex
+kind: mailbox
+actuator: { type: mailbox, provider: namecheap-private-email, mailbox: alex@example.com, from_name: Alex Rivera }
+credentials: secret://mailbox-alex
+actions:
+  send: { params: [to, subject, body, thread_id, in_reply_to], requires: owner_approval }
+```
+
+Rehearsal and tests use `{ type: fixture, data: data/mailbox.json, record_as: { send: sent } }` instead. Each lane names
+its mailbox's resource (`resource: mailbox-alex`). Emails to prospects and replies go through it.
+
+**Deliverability**: `check-lanes` (and the first step of `build-list`) reads public DNS for each lane: SPF, DKIM, DMARC
+and MX on the sending domain, and that no lane sends from the main domain. A lane that is not ready is left out.
+
+**Agents** (they own their tools; the playbook only says what they must be able to act as). Sending an email needs
+nothing: any `send-email` agent drafts and VALOR sends.
 
 | `acts_as` | Needed for |
 |---|---|
-| `outbound-mailbox` | every send (`send-email` tasks), the seed test |
 | `domain-registrar` | buying and authenticating the sending domain |
 | `calendar` | booking meetings |
 
@@ -70,13 +118,15 @@ agents `research` and two `writing`, so peer review has a reviewer who is not th
 
 | Source | Queries | Rows |
 |---|---|---|
-| `campaigns` | `get(id)` | the campaign settings below |
+| `senders` | `get(id)` (no id: every lane) | the sending lanes below |
+| `campaigns` | `get(id)` | each goal's campaign settings below |
 | `prospects` | `search(saved_search)` | `email, name, title, company, tz` |
 | `contacts` | `known(email)` | existing relationships, to exclude |
 | `verifier` | `verify(email)` | `status`: `valid`, `catch_all`, `risky`, `invalid` |
-| `mailbox` | `sent(to)`, `replies(from)` | `message_id, to, subject, body_sha256, sent_at` |
-| `dns` | `auth(domain)` | `spf, dkim, dmarc, mx` |
-| `seeds` | `placement(subject)` | `seed, folder` (`inbox` or `spam`) |
+| `mailbox` | `sent(to)`, `replies(from)` | `message_id, to, subject, body_sha256, sent_at` (live: connector type `mailbox`, IMAP) |
+| `dns` | `auth(domain)` | `spf, dkim, dmarc, mx` (live: connector type `dns`) |
+| `deliverability` | `health(mailbox)` | `mailbox, score (0-100), warmup (active, inactive, paused), spam_rate, blocked, blocked_reason, connected` (live: connector type `smartlead`, API key in the vault) |
+| `clock` | `daily` | one row a day, to start `mailbox-health` (connector type `clock`) |
 | `calendar` | `event(id)`, `attended(attendee)` | `id, start, attendees, status` |
 
 `body_sha256` is the SHA-256 of the body with LF line ends, trailing spaces removed and trimmed (`lib/email.mjs`
@@ -85,19 +135,40 @@ agents `research` and two `writing`, so peer review has a reviewer who is not th
 **Listeners** on the mailbox source, all code only (copy them from `examples/workspace/listeners`):
 `mailbox-optout` (opt-out wording → `suppression`), `mailbox-replied` (→ `replied`), `mailbox-bounced` (→ `bounced`),
 `mailbox-sent` (→ `sent`, the bounce-rate denominator) and `mailbox-reply` (starts `handle-reply` at low trust).
+On the clock source: `daily-mailbox-health` (starts `mailbox-health` once a day).
 The mailbox adapter sets `kind` on each event: `reply`, `bounce`, `sent` or `auto_reply`.
 
-**Grants**: work started by a reply runs at low trust, so grant `initiator:trust:low` query access to `campaigns` and
-`contacts#known`, and nothing else.
+**Grants**: work started by a reply runs at low trust, so grant `initiator:trust:low` query access to `campaigns`,
+`senders` and `contacts#known`, and nothing else. The daily check runs at high trust and reads `deliverability`; give
+the play itself `{ principal: "play:mailbox-health", resource: "resource:warmup#start_warmup", role: act }` so VALOR
+may start warmup for a held mailbox.
 
-**Campaign settings** (one record in `campaigns`; every check and guard reads this one copy):
+**Warmup resource**: the warmup provider's account in the vault, `resources/warmup.yaml`, with action `start_warmup`
+(`requires: grant`). Reference: `actuator: { type: smartlead }`, `credentials: secret://smartlead-api-key`. Each
+mailbox must already be added in the provider (it needs the mailbox login to warm it).
+
+**Sending lanes** (one row per mailbox in `senders`):
+
+```yaml
+id: alex                     # the lane id goals and sequences refer to
+resource: mailbox-alex       # the vault resource VALOR sends from
+name, company, mailbox, domain, primary_domain, postal_address, opt_out_line
+daily_cap: 25                # per mailbox, across every goal
+status: active               # active | warming | planned | paused; only active lanes not held by mailbox-health send
+min_health_score: 90         # mailbox-health clears the lane at or above this; max_spam_rate: 0.03
+warmup_resource: warmup      # optional, default warmup
+setup_budget_usd             # for ready-sender
+```
+
+**Campaign settings** (one record per goal in `campaigns`; the `load` step joins it with the run's lane, so every check
+and guard reads one copy, with `campaign.sender` being that lane):
 
 ```yaml
 id: spring-agencies
 name: Spring outreach to agency founders
-sender:   { name, company, mailbox, primary_domain, postal_address, warmup_days, setup_budget_usd, seed_inboxes, min_inbox_share }
+senders:  [alex, sam]        # optional; default every active lane
 offer:    { ask, claims: [ ... ], pain_points: [ ... ] }
-rules:    { touches, first_max_words, followup_max_words, reply_max_words, max_questions, links_in_first, banned_phrases, opt_out_line, opt_out_pattern? }
+rules:    { touches, first_max_words, followup_max_words, reply_max_words, max_questions, links_in_first, banned_phrases, opt_out_pattern? }
 audience: { description, saved_search, per_company, list_size, reserve_share, max_segment_share, exclude_domains, keep_risky_addresses? }
 research: { hook_max_age_days }
 limits:   { max_bounce_rate, bounce_rate_min_sends }
@@ -147,5 +218,5 @@ to it: `valor eval handle-reply --agent <id>`. Eval tasks are prepare-only and c
 
 ## Tests
 
-`test/` runs every play end to end on the VALOR core with fixture agents and a fake sent folder, seed inboxes and
+`test/` runs every play end to end on the VALOR core with fixture agents and a fake sent folder, warmup provider and
 calendar. Nothing is sent. See the repository README for how to run them.

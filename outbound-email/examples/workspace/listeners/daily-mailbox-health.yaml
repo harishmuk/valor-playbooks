@@ -1,0 +1,6 @@
+# Standing goal: check every mailbox's health once a day.
+id: daily-mailbox-health
+source: clock
+dedupe_key: "mailbox-health:{{event.key}}"
+action: { kind: start_play, play: mailbox-health, goal: outreach, inputs: {} }
+trust: high

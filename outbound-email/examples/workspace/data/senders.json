@@ -1,0 +1,19 @@
+{
+  "get": [
+    {
+      "id": "alex",
+      "name": "Alex Rivera",
+      "company": "Northwind Ledger",
+      "mailbox": "alex@northwindledger-mail.test",
+      "resource": "mailbox-alex",
+      "domain": "northwindledger-mail.test",
+      "primary_domain": "northwindledger.test",
+      "postal_address": "Northwind Ledger, 100 Example Street, Springfield, IL 62701",
+      "opt_out_line": "Not relevant? Reply \"no\" and I won't write again.",
+      "daily_cap": 25,
+      "status": "active",
+      "setup_budget_usd": 80,
+      "min_health_score": 90
+    }
+  ]
+}

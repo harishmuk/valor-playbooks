@@ -1,0 +1,7 @@
+# The workspace's sending lanes: one row per mailbox, set up once and shared by every goal.
+id: senders
+kind: settings
+connector: { type: json-file, data: data/senders.json }
+description: "Sending lanes: mailbox, sender identity, footer, daily cap, status"
+queries:
+  get: { params: [id] }

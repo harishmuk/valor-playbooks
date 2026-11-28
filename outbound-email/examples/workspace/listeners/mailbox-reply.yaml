@@ -1,12 +1,14 @@
-# One Handle a reply run per inbound human reply, at low trust. One listener per sending mailbox names its campaign.
+# One Handle a reply run per inbound human reply, at low trust. It joins the goal of the sequence the person was in,
+# with that sequence's campaign and sending lane, so one listener serves every goal and every mailbox.
 id: mailbox-reply
 source: mailbox
-filter:
-  all:
-    - { field: kind, op: eq, value: reply }
-    - { field: to, op: eq, value: "alex@northwindledger-mail.test" }
+filter: { all: [{ field: kind, op: eq, value: reply }] }
 dedupe_key: "reply:{{event.message_id}}"
-action: { kind: start_play, play: handle-reply, goal: outreach, inputs: { campaign: spring-agencies, email: "{{event.from}}" } }
+action:
+  kind: start_play
+  play: handle-reply
+  follows: { play: prospect-sequence, match: { email: "{{event.from}}" } }
+  inputs: { campaign: "{{origin.campaign}}", sender: "{{origin.sender}}", sender_daily_cap: "{{origin.sender_daily_cap}}", email: "{{event.from}}" }
 response_time: { claim: 30m, done: 4h }
 limits: { per_hour: 30 }
 trust: low

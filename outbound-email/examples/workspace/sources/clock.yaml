@@ -1,0 +1,7 @@
+# Time as a source: one row per period, so recurring work is a listener. Poll it every tick: valor poll clock daily
+id: clock
+kind: other
+connector: { type: clock }
+description: "Starts recurring plays."
+queries:
+  daily: { params: [], every: 1d }

@@ -33,7 +33,7 @@ npm test
 ```
 
 Until the core pull requests merge, check out the core branch with the features playbooks use:
-`git -C ../valor-core checkout claude/project-thread-1rqgss`.
+`git -C ../valor-core checkout claude/project-thread-qxkf8s` (core PR #3: sending lanes, listeners that follow a run).
 
 ## Using a playbook
 

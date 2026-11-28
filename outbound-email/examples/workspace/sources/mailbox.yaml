@@ -1,7 +1,7 @@
 id: mailbox
 kind: email
 connector: { type: fixture, data: data/mailbox.json }
-description: "The sending mailbox, read-only: sent folder and replies. The sending agent owns it."
+description: "The sending mailboxes, read-only: sent folder and replies. VALOR sends through resources/; this is how it reads back."
 queries:
   sent: { params: [to] }
   replies: { params: [from] }

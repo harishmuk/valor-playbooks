@@ -4,7 +4,7 @@ version: 1
 title: Handle a reply
 description: Started by the sending mailbox's reply listener, once per inbound message. Triage it into a fixed label, then answer, book, take a referral or bring it to the owner. Nothing goes back to the sender without the owner's approval.
 inputs: { required: [campaign, event] }
-scope: { sources: [campaigns, contacts, mailbox] }
+scope: { sources: [campaigns, senders, contacts, mailbox] }
 steps:
   - id: load
     kind: code
@@ -52,12 +52,14 @@ steps:
     title: "Send the reply to {{inputs.event.from}}"
     task_type: send-email
     skills: [send-approved-email]
-    requires_acts_as: [outbound-mailbox]
     brief: |
-      Prepare the written reply {{steps.respond.output.id}} to {{inputs.event.from}} exactly as written, in the same thread. Send nothing yet.
-      After the go-ahead, send it once with the go-ahead's idempotency key and report the message id.
+      Prepare the written reply {{steps.respond.output.id}} to {{inputs.event.from}} exactly as written (to, subject, body).
+      You send nothing: once the owner approves, VALOR sends it in the same thread from the mailbox the reply came to.
     done_when: "The sent folder shows exactly one message to the person with the approved body."
-    approval: { action: "reply to {{inputs.event.from}}", idempotency_key: "{{inputs.campaign}}:{{inputs.event.message_id}}:reply" }
+    approval:
+      action: "reply to {{inputs.event.from}}"
+      idempotency_key: "{{inputs.campaign}}:{{inputs.event.message_id}}:reply"
+      act: { resource: "{{inputs.steps.load.output.campaign.sender.resource}}", action: send, params: { to: "{{draft.to}}", subject: "{{draft.subject}}", body: "{{draft.body}}", thread_id: "{{inputs.event.thread_id}}", in_reply_to: "{{inputs.event.rfc822_id}}" } }
     checks:
       - { id: matches-response, kind: code, run: checks/matches-response.mjs }
       - { id: sent, kind: read_back }
@@ -70,7 +72,7 @@ steps:
     after: [triage]
     when: { all: [{ field: steps.triage.output.label, op: eq, value: meeting_time }] }
     play: book-meeting
-    inputs: { campaign: "{{inputs.campaign}}", email: "{{inputs.event.from}}", meeting_time: "{{steps.triage.output.meeting_time}}", thread: "{{inputs.event.thread_id}}" }
+    inputs: { campaign: "{{inputs.campaign}}", sender: "{{inputs.sender}}", email: "{{inputs.event.from}}", meeting_time: "{{steps.triage.output.meeting_time}}", thread: "{{inputs.event.thread_id}}" }
     wait: all
 
   - id: referral-ok
@@ -84,7 +86,7 @@ steps:
     kind: children
     after: [referral-ok]
     play: prospect-sequence
-    inputs: { campaign: "{{inputs.campaign}}", email: "{{steps.triage.output.referral.email}}", name: "{{steps.triage.output.referral.name}}", company: "{{steps.triage.output.referral.company}}", referred_by: "{{inputs.event.from}}" }
+    inputs: { campaign: "{{inputs.campaign}}", sender: "{{inputs.sender}}", sender_daily_cap: "{{inputs.sender_daily_cap}}", email: "{{steps.triage.output.referral.email}}", name: "{{steps.triage.output.referral.name}}", company: "{{steps.triage.output.referral.company}}", referred_by: "{{inputs.event.from}}" }
     wait: none
 
   - id: owner-look
@@ -93,7 +95,7 @@ steps:
     when: { all: [{ field: steps.triage.output.label, op: in, value: [other, wrong_person] }] }
     ask: "A reply needs you ({{steps.triage.output.label}}): {{inputs.event.from}} wrote \"{{steps.triage.output.quote}}\". Approve to archive it, or note what to do."
 
-guards: [suppression, claims-only]
+guards: [suppression, claims-only, sender-health]
 ---
 # Handle a reply
 

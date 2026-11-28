@@ -4,7 +4,7 @@ version: 1
 title: Book the meeting
 description: Book a time the person asked for, prove the invite from the calendar, prepare the owner, and confirm the meeting happened.
 inputs: { required: [campaign, email, meeting_time] }
-scope: { sources: [campaigns, calendar] }
+scope: { sources: [campaigns, senders, calendar] }
 steps:
   - id: load
     kind: code
