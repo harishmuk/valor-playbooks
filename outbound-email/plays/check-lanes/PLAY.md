@@ -2,8 +2,8 @@
 id: check-lanes
 version: 1
 title: Check the sending lanes
-description: Reads public DNS for every sending lane a campaign may use (SPF, DKIM, DMARC, MX, and that no lane sends from the main domain) and reports which are ready. Code only; run it after connecting mailboxes or changing DNS.
-inputs: { required: [campaign] }
+description: Reads public DNS for every sending lane (or those a campaign may use, given `campaign`) (SPF, DKIM, DMARC, MX, and that no lane sends from the main domain) and reports which are ready. Code only; run it after connecting mailboxes or changing DNS.
+inputs: { required: [] }
 scope: { sources: [campaigns, senders, dns] }
 steps:
   - id: load
